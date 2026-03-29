@@ -1,8 +1,8 @@
+import { useState } from 'react';
 import {
   LayoutDashboard, FileText, History, User, Users, CheckSquare,
   LogOut, Menu, X, ChevronRight
 } from 'lucide-react';
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Role = 'FEST_COORDINATOR' | 'COORDINATOR' | 'SUB_COORDINATOR';
@@ -85,6 +85,11 @@ function SidebarItem({
 // ─── Main Sidebar ─────────────────────────────────────────────────────────────
 
 export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobileToggle }: SidebarProps) {
+  // Manage mobile state securely
+  const [isLocalOpen, setIsLocalOpen] = useState(false);
+  const isOpen = mobileOpen !== undefined ? mobileOpen : isLocalOpen;
+  const toggleMenu = () => onMobileToggle ? onMobileToggle() : setIsLocalOpen(!isLocalOpen);
+
   const visibleItems = NAV_ITEMS.filter(item =>
     !item.requiredRoles || (userRole && item.requiredRoles.includes(userRole))
   );
@@ -102,12 +107,12 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
         </div>
         {/* Mobile close */}
         {onMobileToggle && (
-          <button
-            onClick={onMobileToggle}
-            className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 lg:hidden"
-          >
-            <X size={16} />
-          </button>
+         <button
+          onClick={toggleMenu}
+          className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 lg:hidden"
+        >
+          <X size={16} />
+        </button>
         )}
       </div>
 
@@ -121,7 +126,7 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
               key={item.id}
               item={item}
               isActive={activeItem === item.id}
-              onClick={() => { onItemClick(item.id); onMobileToggle?.(); }}
+             onClick={() => { onItemClick(item.id); toggleMenu(); }}
             />
           ))}
 
@@ -140,7 +145,7 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
         <SidebarItem
           item={NAV_ITEMS.find(i => i.id === 'profile')!}
           isActive={activeItem === 'profile'}
-          onClick={() => { onItemClick('profile'); onMobileToggle?.(); }}
+         onClick={() => { onItemClick('profile'); toggleMenu(); }}
         />
       </div>
     </div>
@@ -148,6 +153,16 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
 
   return (
     <>
+      {/* Floating Mobile Hamburger Button */}
+      {!isOpen && (
+        <button
+          onClick={toggleMenu}
+          className="lg:hidden fixed top-4 left-4 z-[100] p-2.5 bg-white border border-gray-200 shadow-md rounded-xl text-gray-800 hover:bg-gray-50 flex items-center justify-center transition-all active:scale-95"
+        >
+          <Menu size={22} />
+        </button>
+      )}
+
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-gray-100 shrink-0 h-screen sticky top-0">
         {/* Logo */}
@@ -200,9 +215,9 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
       </aside>
 
       {/* Mobile: slide-over overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onMobileToggle} />
+      {isOpen && (
+        <div className="fixed inset-0 z-[110] lg:hidden">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={toggleMenu} />
           <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-2xl overflow-hidden">
             {sidebarContent}
           </aside>

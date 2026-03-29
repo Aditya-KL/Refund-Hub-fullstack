@@ -110,6 +110,7 @@ export function ProfileView({ onEditClick, onLogout }: ProfileViewProps) {
                             <InfoItem icon={<Calendar size={14}/>} label="Admission Year" value={user.admissionYear} />
                             <InfoItem icon={<Building size={14}/>} label="Hostel" value={user.hostel} />
                             <InfoItem icon={<Building size={14}/>} label="Block" value={user.block} />
+                            <InfoItem icon={<Building size={14}/>} label="Mess Name" value={user.messName} />
                             <InfoItem icon={<MapPin size={14}/>} label="Room Number" value={user.roomNumber} />
                         </div>
                     </div>
@@ -137,9 +138,19 @@ export function ProfileView({ onEditClick, onLogout }: ProfileViewProps) {
                         </div>
                         <p className="font-bold text-lg text-gray-950">Verified Status</p>
                         <p className="text-sm text-gray-500 mt-2 mb-6 leading-relaxed">
-                            You are eligible for mess rebate and hospital reimburisements.
+                            You are eligible for rebates reimbursements.
                         </p>
                         <hr className="mb-6 border-gray-100" />
+                        {/* <button 
+                            onClick={() => setShowFestModal(true)}
+                            className="w-full group flex items-center justify-between py-3.5 px-5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-2xl font-bold text-sm transition-all border border-emerald-100 hover:border-emerald-600 shadow-sm"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Star size={18} className="group-hover:rotate-12 transition-transform" />
+                                <span>Verify Fest Team</span>
+                            </div>
+                            <ChevronRight size={16} />
+                        </button> */}
                     </div>
                 </div>
             </div>

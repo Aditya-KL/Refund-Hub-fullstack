@@ -50,8 +50,8 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
         fullName: '', studentId: '', email: '', phone: '', profilePicUrl: ''
     });
     
-    const [academicData, setAcademicData] = useState({
-        department: '', hostel: '', block: '', roomNumber: '', admissionYear: ''
+   const [academicData, setAcademicData] = useState({
+        department: '', hostel: '', block: '', roomNumber: '', admissionYear: '', messName: ''
     });
 
     const [bankData, setBankData] = useState({
@@ -86,12 +86,13 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
             profilePicUrl: currentUser.profilePicUrl || ''
         });
 
-        setAcademicData({
+      setAcademicData({
             department: currentUser.department || '',
             hostel: currentUser.hostel || '',
             block: currentUser.block || '',
             roomNumber: currentUser.roomNumber || '',
             admissionYear: currentUser.admissionYear || '',
+            messName: currentUser.messName || '',
         });
 
         const storedBank = currentUser.bankDetails || {};
@@ -223,7 +224,7 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
     const initials = profileData.fullName ? profileData.fullName.split(' ').map((n) => n[0]).join('').toUpperCase() : 'ST';
 
 return (
-    <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-16">
+  <div className="space-y-6 sm:space-y-8 max-w-7xl mx-auto pb-16">
         
         
         {/* Success Toast */}
@@ -367,6 +368,11 @@ return (
                         options={["A", "B", "C", "D"]}
                         onSave={(val) => handleAcademicUpdate('block', val)} 
                      />
+                    <EditableField 
+                        icon={<Building size={16} />} label="Mess Name" 
+                        value={academicData.messName}
+                        onSave={(val) => handleAcademicUpdate('messName', val)} 
+                    />
                     <EditableField 
                         icon={<MapPin size={16} />} label="Room Number" 
                         value={academicData.roomNumber}

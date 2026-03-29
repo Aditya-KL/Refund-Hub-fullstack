@@ -142,10 +142,11 @@ app.post('/api/login', async (req, res) => {
       return res.status(403).json({ message: "Please verify your email before logging in." });
     }
 
-await User.updateOne(
-  { _id: user._id },
-  { $set: { lastLogin: new Date() } }
-);
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { lastLogin: new Date() } }
+    );
+
     res.status(200).json({
       message: "Login successful",
       user: {
@@ -314,6 +315,73 @@ app.get('/api/users/admin/profile', async (req, res) => {
   } catch (error) {
     console.error("Error fetching admin:", error);
     res.status(500).json({ message: 'Server error while fetching admin profile' });
+  }
+});
+
+// ─── SEARCH USER BY ROLL NUMBER OR EMAIL ─────────────────────────────────────
+// Used by the Appoint FC feature to look up a student before assigning them.
+app.get('/api/users/search', async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query || !query.toString().trim()) {
+      return res.status(400).json({ message: "Search query is required." });
+    }
+
+    const q = query.toString().trim();
+
+    const user = await User.findOne({
+      $or: [
+        { studentId: q.toUpperCase() },
+        { email: q.toLowerCase() }
+      ]
+    }).select('-password -verificationToken -resetPasswordToken');
+
+    if (!user) {
+      return res.status(404).json({ message: "No user found with that roll number or email." });
+    }
+
+    res.status(200).json(user);
+
+  } catch (error) {
+    console.error("User search error:", error);
+    res.status(500).json({ message: "Server error while searching user." });
+  }
+});
+
+// ─── UPDATE USER ROLE ─────────────────────────────────────────────────────────
+// Used to assign FC roles (e.g. 'Celesta_FC') or revert back to 'STUDENT'.
+app.put('/api/users/:id/role', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !role.toString().trim()) {
+      return res.status(400).json({ message: "Role is required." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { $set: { role: role.toString().trim() } },
+      { new: true }
+    ).select('-password -verificationToken -resetPasswordToken');
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.status(200).json({
+      message: `Role updated to '${role}' successfully!`,
+      user
+    });
+
+  } catch (error) {
+    console.error("Role update error:", error);
+    res.status(500).json({ message: "Server error while updating role." });
   }
 });
 

@@ -7,13 +7,11 @@ import {
   RotateCcw, DollarSign, Pencil, Save, X, KeyRound, Loader2,
 } from 'lucide-react';
 import {
-  SecretaryLayout, ClaimReviewPanel, StudentSearchInput,
+  SecretaryLayout, ClaimReviewPanel,
   StatCard, StatusBadge, deptConfig,
   type Claim, type SecretaryUser, type FestCoordinator, type StudentUser,
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
-
-const API_BASE = '/api';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type FestName = 'Celesta' | 'Infinito' | 'Anwesha' | 'TedX';
@@ -58,21 +56,18 @@ function DynamicProfilePage({
 }) {
   const cfg = deptConfig.fest;
 
-  // ── Edit state
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: '', phone: '', institution: '' });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
 
-  // ── Password state
   const [showPassword, setShowPassword] = useState(false);
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
 
-  // Seed edit form whenever user loads / changes
   useEffect(() => {
     if (user) {
       setEditForm({
@@ -83,7 +78,6 @@ function DynamicProfilePage({
     }
   }, [user]);
 
-  // ── Save profile edits to DB
   const handleSaveProfile = async () => {
     if (!user) return;
     setEditError('');
@@ -112,7 +106,6 @@ function DynamicProfilePage({
     }
   };
 
-  // ── Change password via DB
   const handleChangePassword = async () => {
     setPwError('');
     setPwSuccess('');
@@ -156,8 +149,6 @@ function DynamicProfilePage({
 
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5 max-w-3xl mx-auto">
-
-      {/* ── Header card */}
       <div className="rounded-2xl p-5 flex items-center gap-4 bg-gradient-to-r from-violet-500 to-purple-600">
         <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center text-white font-black text-xl flex-shrink-0">
           {initials}
@@ -177,19 +168,16 @@ function DynamicProfilePage({
         )}
       </div>
 
-      {/* ── Edit success banner */}
       {editSuccess && (
         <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium">
           <CheckCircle size={16} /> {editSuccess}
         </div>
       )}
 
-      {/* ── Personal Information */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-5">
         <h3 className="font-bold text-slate-700">Personal Information</h3>
 
         {isEditing ? (
-          // ── Edit form (no bio / address)
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -242,7 +230,6 @@ function DynamicProfilePage({
             </div>
           </div>
         ) : (
-          // ── Read-only view
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             {[
               { label: 'Full Name', value: user.fullName },
@@ -273,7 +260,6 @@ function DynamicProfilePage({
         )}
       </div>
 
-      {/* ── Change Password */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
         <button
           onClick={() => { setShowPassword(v => !v); setPwError(''); setPwSuccess(''); }}
@@ -355,7 +341,6 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
         <StatCard label="Total Approved ₹" value={`₹${(stats.totalAmount / 1000).toFixed(1)}K`} icon={DollarSign} color="bg-emerald-100 text-emerald-600" />
       </div>
 
-      {/* Fest-wise breakdown */}
       <div>
         <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3">Fest-wise Breakdown</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -381,7 +366,6 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
         </div>
       </div>
 
-      {/* FC Summary */}
       <div>
         <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3">Active Fest Coordinators</h3>
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -410,24 +394,49 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
 }
 
 // ─── Appoint FC ────────────────────────────────────────────────────────────────
-function AppointFCPage({ fcList, setFcList }: { fcList: FestCoordinator[]; setFcList: React.Dispatch<React.SetStateAction<FestCoordinator[]>> }) {
+function AppointFCPage({
+  fcList,
+  setFcList,
+}: {
+  fcList: FestCoordinator[];
+  setFcList: React.Dispatch<React.SetStateAction<FestCoordinator[]>>;
+}) {
   const [selectedFest, setSelectedFest] = useState<FestName>('Celesta');
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
 
+  // ── Helpers
   const festFCs = (fest: FestName) => fcList.filter(fc => fc.festName === fest);
   const canAdd = (fest: FestName) => festFCs(fest).length < 2;
 
-  const handleSelect = (user: StudentUser, fest: FestName) => {
+  // ── Add FC: called after role is already updated in DB by LiveStudentSearch
+  const handleSelect = (user: any, fest: FestName) => {
+    // Prevent duplicate
     if (fcList.some(fc => fc.userId === user._id && fc.festName === fest)) return;
     if (!canAdd(fest)) return;
+
     const newFC: FestCoordinator = {
-      userId: user._id, fullName: user.fullName, studentRoll: user.studentId,
-      email: user.email, festName: fest, assignedAt: new Date().toISOString(), isActive: true,
+      userId: user._id,
+      fullName: user.fullName,
+      studentRoll: user.studentId,   // real DB field
+      email: user.email,
+      festName: fest,
+      assignedAt: new Date().toISOString(),
+      isActive: true,
     };
     setFcList(prev => [...prev, newFC]);
   };
 
-  const handleRemove = (userId: string, fest: FestName) => {
+  // ── Remove FC: revert role back to STUDENT in DB
+  const handleRemove = async (userId: string, fest: FestName) => {
+    setRemoveLoading(true);
+    try {
+      await apiService.updateUserRole(userId, 'STUDENT');
+    } catch (e) {
+      console.error('Failed to revert role:', e);
+    } finally {
+      setRemoveLoading(false);
+    }
     setFcList(prev => prev.filter(fc => !(fc.userId === userId && fc.festName === fest)));
     setConfirmRemove(null);
   };
@@ -446,9 +455,25 @@ function AppointFCPage({ fcList, setFcList }: { fcList: FestCoordinator[]; setFc
           const grad = festColors[fest];
           const active = selectedFest === fest;
           return (
-            <button key={fest} onClick={() => setSelectedFest(fest)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${active ? 'text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'}`}
-              style={active ? { background: `linear-gradient(135deg, ${grad.includes('violet') ? '#8b5cf6,#7c3aed' : grad.includes('blue') ? '#3b82f6,#06b6d4' : grad.includes('rose') ? '#f43f5e,#ec4899' : '#ef4444,#f97316'})` } : {}}>
+            <button
+              key={fest}
+              onClick={() => setSelectedFest(fest)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                active ? 'text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+              }`}
+              style={
+                active
+                  ? {
+                      background: `linear-gradient(135deg, ${
+                        grad.includes('violet') ? '#8b5cf6,#7c3aed'
+                        : grad.includes('blue') ? '#3b82f6,#06b6d4'
+                        : grad.includes('rose') ? '#f43f5e,#ec4899'
+                        : '#ef4444,#f97316'
+                      })`,
+                    }
+                  : {}
+              }
+            >
               <Icon size={15} className={active ? 'text-white' : 'text-slate-400'} />
               {fest}
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'}`}>
@@ -460,7 +485,7 @@ function AppointFCPage({ fcList, setFcList }: { fcList: FestCoordinator[]; setFc
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Assigned FCs */}
+        {/* ── Assigned FCs panel */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h3 className="font-bold text-slate-700">Assigned to {selectedFest}</h3>
@@ -472,31 +497,45 @@ function AppointFCPage({ fcList, setFcList }: { fcList: FestCoordinator[]; setFc
                 <Star size={32} className="text-slate-200 mx-auto mb-3" />
                 <p className="text-sm text-slate-400">No FCs assigned for {selectedFest}</p>
               </div>
-            ) : festFCs(selectedFest).map(fc => (
-              <div key={fc.userId} className="flex items-center gap-4 px-5 py-4">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${festColors[selectedFest]} flex items-center justify-center flex-shrink-0`}>
-                  <span className="text-white font-bold text-xs">{fc.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}</span>
+            ) : (
+              festFCs(selectedFest).map(fc => (
+                <div key={fc.userId} className="flex items-center gap-4 px-5 py-4">
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${festColors[selectedFest]} flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-white font-bold text-xs">
+                      {fc.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-700 text-sm">{fc.fullName}</p>
+                    <p className="text-xs text-slate-400">{fc.studentRoll} · {fc.email}</p>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Since {new Date(fc.assignedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setConfirmRemove(`${fc.userId}:${fc.festName}`)}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors flex-shrink-0"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-700 text-sm">{fc.fullName}</p>
-                  <p className="text-xs text-slate-400">{fc.studentRoll} · {fc.email}</p>
-                  <p className="text-xs text-slate-300 mt-0.5">Since {new Date(fc.assignedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
-                </div>
-                <button onClick={() => setConfirmRemove(`${fc.userId}:${fc.festName}`)}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors flex-shrink-0">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
-        {/* Add FC */}
+        {/* ── Add FC panel */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
           <h3 className="font-bold text-slate-700 mb-1">Add New FC for {selectedFest}</h3>
           <p className="text-xs text-slate-400 mb-4">Search by roll number or email</p>
+
           {canAdd(selectedFest) ? (
-            <StudentSearchInput placeholder="Search student by roll no. or email..." onSelect={u => handleSelect(u, selectedFest)} />
+            // ── Live search component — fully self-contained
+            <LiveStudentSearch
+              fest={selectedFest}
+              fcList={fcList}
+              onAdd={(user) => handleSelect(user, selectedFest)}
+            />
           ) : (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
               <AlertTriangle size={20} className="text-amber-500 mx-auto mb-2" />
@@ -504,15 +543,18 @@ function AppointFCPage({ fcList, setFcList }: { fcList: FestCoordinator[]; setFc
               <p className="text-xs text-amber-500 mt-1">Remove an existing FC to add a new one</p>
             </div>
           )}
+
           <div className="mt-4 p-4 bg-violet-50 rounded-xl border border-violet-100">
             <p className="text-xs text-violet-700 leading-relaxed">
-              <strong>Note:</strong> Assigned FCs receive the role <code className="bg-violet-100 px-1 rounded">{selectedFest}_FC</code> and can verify fest reimbursement claims. Removing them will revoke this role.
+              <strong>Note:</strong> Assigned FCs receive the role{' '}
+              <code className="bg-violet-100 px-1 rounded">{selectedFest}_FC</code> and can verify fest
+              reimbursement claims. Removing them will revoke this role.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Confirm Remove Modal */}
+      {/* ── Confirm Remove Modal */}
       {confirmRemove && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -526,11 +568,207 @@ function AppointFCPage({ fcList, setFcList }: { fcList: FestCoordinator[]; setFc
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => setConfirmRemove(null)} className="flex-1 py-2.5 bg-slate-100 rounded-xl text-sm font-bold text-slate-600">Cancel</button>
-              <button onClick={() => { const [userId, fest] = confirmRemove.split(':'); handleRemove(userId, fest as FestName); }}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold">Remove</button>
+              <button
+                onClick={() => setConfirmRemove(null)}
+                disabled={removeLoading}
+                className="flex-1 py-2.5 bg-slate-100 rounded-xl text-sm font-bold text-slate-600 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const [userId, fest] = confirmRemove.split(':');
+                  handleRemove(userId, fest as FestName);
+                }}
+                disabled={removeLoading}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {removeLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                {removeLoading ? 'Removing…' : 'Remove'}
+              </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Live Student Search ───────────────────────────────────────────────────────
+// Self-contained search UI: queries DB, shows result or "not found", assigns role on Add.
+function LiveStudentSearch({
+  fest,
+  fcList,
+  onAdd,
+}: {
+  fest: FestName;
+  fcList: FestCoordinator[];
+  onAdd: (user: any) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState<any | null>(null);       // found user object
+  const [notFound, setNotFound] = useState(false);               // explicit not-found flag
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [addSuccess, setAddSuccess] = useState('');
+
+  // Reset state when fest tab changes
+  useEffect(() => {
+    setQuery('');
+    setResult(null);
+    setNotFound(false);
+    setAddError('');
+    setAddSuccess('');
+  }, [fest]);
+
+  const handleSearch = async () => {
+    const q = query.trim();
+    if (!q) return;
+
+    setSearchLoading(true);
+    setResult(null);
+    setNotFound(false);
+    setAddError('');
+    setAddSuccess('');
+
+    try {
+      const user = await apiService.searchUser(q);
+      if (user) {
+        setResult(user);
+      } else {
+        setNotFound(true);
+      }
+    } catch {
+      setNotFound(true);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleAdd = async () => {
+    if (!result) return;
+    setAddError('');
+    setAddSuccess('');
+
+    // Guard: already assigned to this fest
+    if (fcList.some(fc => fc.userId === result._id && fc.festName === fest)) {
+      setAddError('This student is already an FC for this fest.');
+      return;
+    }
+
+    setAddLoading(true);
+    try {
+      await apiService.updateUserRole(result._id, `${fest}_FC`);
+      onAdd(result);         // update local FC list in parent
+      setAddSuccess(`${result.fullName} added as ${fest} FC!`);
+      setResult(null);
+      setQuery('');
+    } catch (e: any) {
+      setAddError(e.message || 'Failed to assign FC role. Please try again.');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Search bar */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={e => {
+              setQuery(e.target.value);
+              // Clear previous result when user types again
+              if (result || notFound) {
+                setResult(null);
+                setNotFound(false);
+                setAddError('');
+                setAddSuccess('');
+              }
+            }}
+            onKeyDown={e => e.key === 'Enter' && handleSearch()}
+            placeholder="Roll no. or email address..."
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          />
+        </div>
+        <button
+          onClick={handleSearch}
+          disabled={searchLoading || !query.trim()}
+          className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-1.5 transition-colors flex-shrink-0"
+        >
+          {searchLoading
+            ? <Loader2 size={14} className="animate-spin" />
+            : <Search size={14} />}
+          Search
+        </button>
+      </div>
+
+      {/* Not found */}
+      {notFound && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+          <XCircle size={16} className="flex-shrink-0" />
+          No user found with that roll number or email.
+        </div>
+      )}
+
+      {/* Found user card */}
+      {result && (
+        <div className="border border-green-200 bg-green-50 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-violet-700 font-bold text-xs">
+                {result.fullName
+                  ?.split(' ')
+                  .map((n: string) => n[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800">{result.fullName}</p>
+              <p className="text-xs text-slate-500">{result.studentId} · {result.email}</p>
+              {result.department && (
+                <p className="text-xs text-slate-400 capitalize mt-0.5">Dept: {result.department}</p>
+              )}
+            </div>
+            <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
+          </div>
+
+          {/* Already assigned warning */}
+          {fcList.some(fc => fc.userId === result._id && fc.festName === fest) ? (
+            <div className="flex items-center gap-2 text-amber-600 text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} /> Already assigned as {fest} FC.
+            </div>
+          ) : (
+            <button
+              onClick={handleAdd}
+              disabled={addLoading}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-60 transition-colors"
+            >
+              {addLoading
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Plus size={14} />}
+              {addLoading ? 'Assigning…' : `Add as ${fest} FC`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Add error */}
+      {addError && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+          <XCircle size={15} className="flex-shrink-0" /> {addError}
+        </div>
+      )}
+
+      {/* Add success */}
+      {addSuccess && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium">
+          <CheckCircle size={15} className="flex-shrink-0" /> {addSuccess}
         </div>
       )}
     </div>
@@ -746,7 +984,6 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   const [claims, setClaims] = useState<Claim[]>(mockClaims);
   const [fcList, setFcList] = useState<FestCoordinator[]>(mockFCList);
 
-  // ── Fetch real user from localStorage (set during login)
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (stored) {
@@ -772,7 +1009,6 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
         }
       } catch (_) {}
     }
-    // Fallback to mock if no real session found
     setUser(mockUser);
   }, []);
 
