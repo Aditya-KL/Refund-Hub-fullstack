@@ -3,7 +3,7 @@ import {
   Home, Users, CheckSquare, Archive, User,
   Plus, Trash2, Star, Music, Zap, Globe, Mic,
   TrendingUp, Clock, CheckCircle, XCircle, AlertTriangle,
-  Search, Filter, RefreshCw, ChevronDown, Eye,
+  Search, RefreshCw, Eye,
   RotateCcw, DollarSign, Pencil, Save, X, KeyRound, Loader2,
 } from 'lucide-react';
 import {
@@ -24,7 +24,10 @@ const festColors: Record<FestName, string> = {
   TedX: 'from-red-500 to-orange-600',
 };
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
+// Base URL — reads from your .env (VITE_API_BASE_URL) or falls back to localhost
+const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// ─── Mock Data (fallback only) ─────────────────────────────────────────────────
 const mockUser: SecretaryUser = {
   _id: 'sec_fest_001', fullName: 'Prof. Vikram Nair', employeeId: 'EMP-F01',
   email: 'vikram.nair@nit.edu', phone: '9876500001', department: 'fest',
@@ -33,18 +36,23 @@ const mockUser: SecretaryUser = {
   isVerified: true, isSecretary: true, isSuperAdmin: false,
 };
 
-const mockFCList: FestCoordinator[] = [
-  { userId: 'u10', fullName: 'Arjun Mehta', studentRoll: '21BCS045', email: 'arjun@nit.edu', festName: 'Celesta', assignedAt: '2026-01-10', isActive: true },
-  { userId: 'u11', fullName: 'Sneha Patel', studentRoll: '21BEE023', email: 'sneha@nit.edu', festName: 'Celesta', assignedAt: '2026-01-10', isActive: true },
-  { userId: 'u12', fullName: 'Rahul Das', studentRoll: '21BME011', email: 'rahul@nit.edu', festName: 'Infinito', assignedAt: '2026-02-01', isActive: true },
-];
-
+// Mock claims kept until claims are made dynamic too
 const mockClaims: Claim[] = [
   { _id: 'c1', claimRefId: 'FEST-2026-001', studentId: 'u20', studentName: 'Priya Sharma', studentRoll: '22BCS001', studentEmail: 'priya@nit.edu', department: 'fest', title: 'Celesta Participation Rebate', description: 'Participated in cultural events during Celesta 2026. Submitting for reimbursement of travel and accommodation.', amount: 1800, submittedAt: '2026-03-10T09:00:00Z', attachments: [{ url: 'https://images.unsplash.com/photo-1633158829585-23ba8f7c8caf?w=800', filename: 'receipt_celesta.jpg' }], status: 'verified', festName: 'Celesta', fcVerifiedBy: 'Arjun Mehta', fcVerifiedAt: '2026-03-11T10:00:00Z', fcComment: 'Participation confirmed. Receipts valid.' },
   { _id: 'c2', claimRefId: 'FEST-2026-002', studentId: 'u21', studentName: 'Amit Roy', studentRoll: '22BEE045', studentEmail: 'amit@nit.edu', department: 'fest', title: 'TedX Volunteer Reimbursement', description: 'Volunteer at TedX NIT 2026. Claiming for logistics and travel expenses.', amount: 1200, submittedAt: '2026-03-12T10:00:00Z', attachments: [], status: 'verified', festName: 'TedX', fcComment: 'Verified volunteer participation.' },
   { _id: 'c3', claimRefId: 'FEST-2026-003', studentId: 'u22', studentName: 'Kavya Menon', studentRoll: '22BCH010', studentEmail: 'kavya@nit.edu', department: 'fest', title: 'Anwesha Cultural Performance', description: 'Classical dance performance at Anwesha. Costume and travel reimbursement.', amount: 3500, submittedAt: '2026-03-13T11:00:00Z', attachments: [], status: 'approved', festName: 'Anwesha' },
   { _id: 'c4', claimRefId: 'FEST-2026-004', studentId: 'u23', studentName: 'Dev Patel', studentRoll: '22BCS088', studentEmail: 'dev@nit.edu', department: 'fest', title: 'Infinito Tech Event Rebate', description: 'Won inter-college hackathon at Infinito. Travel and logistics claim.', amount: 2200, submittedAt: '2026-03-14T08:00:00Z', attachments: [], status: 'rejected', festName: 'Infinito', rejectionReason: 'Missing original receipts.' },
 ];
+
+// ─── Helper: compute current academic year string ──────────────────────────────
+function getCurrentAcademicYear(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-indexed; June = 5, July = 6
+  return month >= 6
+    ? `${year}-${String(year + 1).slice(2)}`
+    : `${year - 1}-${String(year).slice(2)}`;
+}
 
 // ─── Dynamic Profile Page ──────────────────────────────────────────────────────
 function DynamicProfilePage({
@@ -54,8 +62,6 @@ function DynamicProfilePage({
   user: SecretaryUser | null;
   setUser: React.Dispatch<React.SetStateAction<SecretaryUser | null>>;
 }) {
-  const cfg = deptConfig.fest;
-
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: '', phone: '', institution: '' });
   const [editLoading, setEditLoading] = useState(false);
@@ -319,12 +325,18 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
     total: claims.length,
     verified: claims.filter(c => c.status === 'verified').length,
     approved: claims.filter(c => c.status === 'approved').length,
-    totalAmount: claims.filter(c => c.status === 'approved' || c.status === 'disbursed').reduce((s, c) => s + c.amount, 0),
+    totalAmount: claims
+      .filter(c => c.status === 'approved' || c.status === 'disbursed')
+      .reduce((s, c) => s + c.amount, 0),
   };
+
   const festStats = FESTS.map(f => ({
-    name: f, total: claims.filter(c => c.festName === f).length,
+    name: f,
+    total: claims.filter(c => c.festName === f).length,
     approved: claims.filter(c => c.festName === f && (c.status === 'approved' || c.status === 'disbursed')).length,
-    amount: claims.filter(c => c.festName === f && (c.status === 'approved' || c.status === 'disbursed')).reduce((s, c) => s + c.amount, 0),
+    amount: claims
+      .filter(c => c.festName === f && (c.status === 'approved' || c.status === 'disbursed'))
+      .reduce((s, c) => s + c.amount, 0),
   }));
 
   return (
@@ -372,10 +384,11 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
           {fcList.length === 0 ? (
             <div className="py-10 text-center text-slate-400 text-sm">No FCs assigned yet</div>
           ) : fcList.map((fc, i) => {
-            const Icon = festIcons[fc.festName as FestName];
-            const grad = festColors[fc.festName as FestName];
+            const festName = fc.festName as FestName;
+            const Icon = festIcons[festName] || Music;
+            const grad = festColors[festName] || 'from-slate-400 to-slate-500';
             return (
-              <div key={fc.userId} className={`flex items-center gap-4 px-5 py-3.5 ${i < fcList.length - 1 ? 'border-b border-slate-100' : ''}`}>
+              <div key={fc.memberId} className={`flex items-center gap-4 px-5 py-3.5 ${i < fcList.length - 1 ? 'border-b border-slate-100' : ''}`}>
                 <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${grad} flex items-center justify-center flex-shrink-0`}>
                   <Icon size={14} className="text-white" />
                 </div>
@@ -393,227 +406,29 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
   );
 }
 
-// ─── Appoint FC ────────────────────────────────────────────────────────────────
-function AppointFCPage({
-  fcList,
-  setFcList,
-}: {
-  fcList: FestCoordinator[];
-  setFcList: React.Dispatch<React.SetStateAction<FestCoordinator[]>>;
-}) {
-  const [selectedFest, setSelectedFest] = useState<FestName>('Celesta');
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const [removeLoading, setRemoveLoading] = useState(false);
-
-  // ── Helpers
-  const festFCs = (fest: FestName) => fcList.filter(fc => fc.festName === fest);
-  const canAdd = (fest: FestName) => festFCs(fest).length < 2;
-
-  // ── Add FC: called after role is already updated in DB by LiveStudentSearch
-  const handleSelect = (user: any, fest: FestName) => {
-    // Prevent duplicate
-    if (fcList.some(fc => fc.userId === user._id && fc.festName === fest)) return;
-    if (!canAdd(fest)) return;
-
-    const newFC: FestCoordinator = {
-      userId: user._id,
-      fullName: user.fullName,
-      studentRoll: user.studentId,   // real DB field
-      email: user.email,
-      festName: fest,
-      assignedAt: new Date().toISOString(),
-      isActive: true,
-    };
-    setFcList(prev => [...prev, newFC]);
-  };
-
-  // ── Remove FC: revert role back to STUDENT in DB
-  const handleRemove = async (userId: string, fest: FestName) => {
-    setRemoveLoading(true);
-    try {
-      await apiService.updateUserRole(userId, 'STUDENT');
-    } catch (e) {
-      console.error('Failed to revert role:', e);
-    } finally {
-      setRemoveLoading(false);
-    }
-    setFcList(prev => prev.filter(fc => !(fc.userId === userId && fc.festName === fest)));
-    setConfirmRemove(null);
-  };
-
-  return (
-    <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">Appoint Fest Coordinators</h2>
-        <p className="text-slate-500 text-sm mt-0.5">Assign up to 2 FCs per fest. They can verify reimbursement claims.</p>
-      </div>
-
-      {/* Fest tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {FESTS.map(fest => {
-          const Icon = festIcons[fest];
-          const grad = festColors[fest];
-          const active = selectedFest === fest;
-          return (
-            <button
-              key={fest}
-              onClick={() => setSelectedFest(fest)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
-                active ? 'text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
-              }`}
-              style={
-                active
-                  ? {
-                      background: `linear-gradient(135deg, ${
-                        grad.includes('violet') ? '#8b5cf6,#7c3aed'
-                        : grad.includes('blue') ? '#3b82f6,#06b6d4'
-                        : grad.includes('rose') ? '#f43f5e,#ec4899'
-                        : '#ef4444,#f97316'
-                      })`,
-                    }
-                  : {}
-              }
-            >
-              <Icon size={15} className={active ? 'text-white' : 'text-slate-400'} />
-              {fest}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                {festFCs(fest).length}/2
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* ── Assigned FCs panel */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-700">Assigned to {selectedFest}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{festFCs(selectedFest).length}/2 slots filled</p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {festFCs(selectedFest).length === 0 ? (
-              <div className="py-12 text-center">
-                <Star size={32} className="text-slate-200 mx-auto mb-3" />
-                <p className="text-sm text-slate-400">No FCs assigned for {selectedFest}</p>
-              </div>
-            ) : (
-              festFCs(selectedFest).map(fc => (
-                <div key={fc.userId} className="flex items-center gap-4 px-5 py-4">
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${festColors[selectedFest]} flex items-center justify-center flex-shrink-0`}>
-                    <span className="text-white font-bold text-xs">
-                      {fc.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-700 text-sm">{fc.fullName}</p>
-                    <p className="text-xs text-slate-400">{fc.studentRoll} · {fc.email}</p>
-                    <p className="text-xs text-slate-300 mt-0.5">
-                      Since {new Date(fc.assignedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setConfirmRemove(`${fc.userId}:${fc.festName}`)}
-                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors flex-shrink-0"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ── Add FC panel */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-          <h3 className="font-bold text-slate-700 mb-1">Add New FC for {selectedFest}</h3>
-          <p className="text-xs text-slate-400 mb-4">Search by roll number or email</p>
-
-          {canAdd(selectedFest) ? (
-            // ── Live search component — fully self-contained
-            <LiveStudentSearch
-              fest={selectedFest}
-              fcList={fcList}
-              onAdd={(user) => handleSelect(user, selectedFest)}
-            />
-          ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-              <AlertTriangle size={20} className="text-amber-500 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-amber-700">Maximum 2 FCs reached for {selectedFest}</p>
-              <p className="text-xs text-amber-500 mt-1">Remove an existing FC to add a new one</p>
-            </div>
-          )}
-
-          <div className="mt-4 p-4 bg-violet-50 rounded-xl border border-violet-100">
-            <p className="text-xs text-violet-700 leading-relaxed">
-              <strong>Note:</strong> Assigned FCs receive the role{' '}
-              <code className="bg-violet-100 px-1 rounded">{selectedFest}_FC</code> and can verify fest
-              reimbursement claims. Removing them will revoke this role.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Confirm Remove Modal */}
-      {confirmRemove && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <AlertTriangle size={20} className="text-red-500" />
-              </div>
-              <div>
-                <h4 className="font-bold text-slate-800">Remove FC?</h4>
-                <p className="text-slate-500 text-sm">Their {selectedFest}_FC role will be revoked.</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmRemove(null)}
-                disabled={removeLoading}
-                className="flex-1 py-2.5 bg-slate-100 rounded-xl text-sm font-bold text-slate-600 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  const [userId, fest] = confirmRemove.split(':');
-                  handleRemove(userId, fest as FestName);
-                }}
-                disabled={removeLoading}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
-              >
-                {removeLoading ? <Loader2 size={14} className="animate-spin" /> : null}
-                {removeLoading ? 'Removing…' : 'Remove'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Live Student Search ───────────────────────────────────────────────────────
-// Self-contained search UI: queries DB, shows result or "not found", assigns role on Add.
 function LiveStudentSearch({
   fest,
+  festId,
   fcList,
+  currentUserId,
   onAdd,
 }: {
   fest: FestName;
+  festId: string;
   fcList: FestCoordinator[];
-  onAdd: (user: any) => void;
+  currentUserId: string;
+  onAdd: (member: FestCoordinator) => void;
 }) {
   const [query, setQuery] = useState('');
-  const [result, setResult] = useState<any | null>(null);       // found user object
-  const [notFound, setNotFound] = useState(false);               // explicit not-found flag
+  const [result, setResult] = useState<any | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
   const [addSuccess, setAddSuccess] = useState('');
 
-  // Reset state when fest tab changes
+  // Reset all state when the selected fest tab changes
   useEffect(() => {
     setQuery('');
     setResult(null);
@@ -622,23 +437,28 @@ function LiveStudentSearch({
     setAddSuccess('');
   }, [fest]);
 
+  const resetSearch = () => {
+    setResult(null);
+    setNotFound(false);
+    setAddError('');
+    setAddSuccess('');
+  };
+
   const handleSearch = async () => {
     const q = query.trim();
     if (!q) return;
 
     setSearchLoading(true);
-    setResult(null);
-    setNotFound(false);
-    setAddError('');
-    setAddSuccess('');
+    resetSearch();
 
     try {
-      const user = await apiService.searchUser(q);
-      if (user) {
-        setResult(user);
-      } else {
+      const res = await fetch(`${BASE}/api/users/search?query=${encodeURIComponent(q)}`);
+      if (!res.ok) {
         setNotFound(true);
+        return;
       }
+      const user = await res.json();
+      setResult(user);
     } catch {
       setNotFound(true);
     } finally {
@@ -648,19 +468,44 @@ function LiveStudentSearch({
 
   const handleAdd = async () => {
     if (!result) return;
-    setAddError('');
-    setAddSuccess('');
-
-    // Guard: already assigned to this fest
-    if (fcList.some(fc => fc.userId === result._id && fc.festName === fest)) {
-      setAddError('This student is already an FC for this fest.');
+    if (!festId) {
+      setAddError('Fest not found in database. Please run the seed script first (node seed-fests.js).');
       return;
     }
 
+    setAddError('');
+    setAddSuccess('');
     setAddLoading(true);
+
     try {
-      await apiService.updateUserRole(result._id, `${fest}_FC`);
-      onAdd(result);         // update local FC list in parent
+      const res = await fetch(`${BASE}/api/fest-members/assign-fc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: result._id,
+          festId,
+          festName: fest,
+          addedBy: currentUserId,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to assign FC.');
+
+      // Map API response → FestCoordinator shape used by frontend
+      const m = data.member;
+      const newFC: FestCoordinator = {
+        memberId: m._id,
+        userId: m.user._id,
+        fullName: m.user.fullName,
+        studentRoll: m.user.studentId,
+        email: m.user.email,
+        festName: fest,
+        assignedAt: m.createdAt,
+        isActive: true,
+      };
+
+      onAdd(newFC);
       setAddSuccess(`${result.fullName} added as ${fest} FC!`);
       setResult(null);
       setQuery('');
@@ -670,6 +515,8 @@ function LiveStudentSearch({
       setAddLoading(false);
     }
   };
+
+  const alreadyAssigned = result && fcList.some(fc => fc.userId === result._id && fc.festName === fest);
 
   return (
     <div className="space-y-3">
@@ -681,13 +528,8 @@ function LiveStudentSearch({
             value={query}
             onChange={e => {
               setQuery(e.target.value);
-              // Clear previous result when user types again
-              if (result || notFound) {
-                setResult(null);
-                setNotFound(false);
-                setAddError('');
-                setAddSuccess('');
-              }
+              // Clear stale result when user starts typing again
+              if (result || notFound) resetSearch();
             }}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             placeholder="Roll no. or email address..."
@@ -699,14 +541,12 @@ function LiveStudentSearch({
           disabled={searchLoading || !query.trim()}
           className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-50 flex items-center gap-1.5 transition-colors flex-shrink-0"
         >
-          {searchLoading
-            ? <Loader2 size={14} className="animate-spin" />
-            : <Search size={14} />}
+          {searchLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           Search
         </button>
       </div>
 
-      {/* Not found */}
+      {/* Not found state */}
       {notFound && (
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
           <XCircle size={16} className="flex-shrink-0" />
@@ -738,34 +578,29 @@ function LiveStudentSearch({
             <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
           </div>
 
-          {/* Already assigned warning */}
-          {fcList.some(fc => fc.userId === result._id && fc.festName === fest) ? (
+          {alreadyAssigned ? (
             <div className="flex items-center gap-2 text-amber-600 text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               <AlertTriangle size={13} /> Already assigned as {fest} FC.
             </div>
           ) : (
             <button
               onClick={handleAdd}
-              disabled={addLoading}
+              disabled={addLoading || !festId}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold disabled:opacity-60 transition-colors"
             >
-              {addLoading
-                ? <Loader2 size={14} className="animate-spin" />
-                : <Plus size={14} />}
+              {addLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               {addLoading ? 'Assigning…' : `Add as ${fest} FC`}
             </button>
           )}
         </div>
       )}
 
-      {/* Add error */}
+      {/* Error / success feedback */}
       {addError && (
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
           <XCircle size={15} className="flex-shrink-0" /> {addError}
         </div>
       )}
-
-      {/* Add success */}
       {addSuccess && (
         <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium">
           <CheckCircle size={15} className="flex-shrink-0" /> {addSuccess}
@@ -775,8 +610,228 @@ function LiveStudentSearch({
   );
 }
 
+// ─── Appoint FC ────────────────────────────────────────────────────────────────
+function AppointFCPage({
+  fcList,
+  setFcList,
+  festIdMap,
+  currentUserId,
+}: {
+  fcList: FestCoordinator[];
+  setFcList: React.Dispatch<React.SetStateAction<FestCoordinator[]>>;
+  festIdMap: Record<string, string>; // festName → MongoDB ObjectId string
+  currentUserId: string;
+}) {
+  const [selectedFest, setSelectedFest] = useState<FestName>('Celesta');
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null); // memberId to remove
+  const [removeLoading, setRemoveLoading] = useState(false);
+  const [removeError, setRemoveError] = useState('');
+
+  const festFCs = (fest: FestName) => fcList.filter(fc => fc.festName === fest);
+  const canAdd = (fest: FestName) => festFCs(fest).length < 2;
+
+  // Called by LiveStudentSearch after DB record is created successfully
+  const handleSelect = (member: FestCoordinator) => {
+    setFcList(prev => [...prev, member]);
+  };
+
+  // Remove FC: soft-delete FestMember in DB, revert role to STUDENT
+  const handleRemove = async (memberId: string) => {
+    setRemoveLoading(true);
+    setRemoveError('');
+    try {
+      const res = await fetch(`${BASE}/api/fest-members/${memberId}/remove-fc`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to remove FC.');
+
+      setFcList(prev => prev.filter(fc => fc.memberId !== memberId));
+      setConfirmRemoveId(null);
+    } catch (e: any) {
+      setRemoveError(e.message || 'Something went wrong. Please try again.');
+    } finally {
+      setRemoveLoading(false);
+    }
+  };
+
+  // Get gradient style for active fest tab button
+  const getActiveGradient = (fest: FestName): string => {
+    const grad = festColors[fest];
+    if (grad.includes('violet')) return 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+    if (grad.includes('blue'))   return 'linear-gradient(135deg, #3b82f6, #06b6d4)';
+    if (grad.includes('rose'))   return 'linear-gradient(135deg, #f43f5e, #ec4899)';
+    return 'linear-gradient(135deg, #ef4444, #f97316)';
+  };
+
+  return (
+    <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-slate-800">Appoint Fest Coordinators</h2>
+        <p className="text-slate-500 text-sm mt-0.5">
+          Assign up to 2 FCs per fest. They can verify reimbursement claims.
+        </p>
+      </div>
+
+      {/* Fest tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {FESTS.map(fest => {
+          const Icon = festIcons[fest];
+          const active = selectedFest === fest;
+          return (
+            <button
+              key={fest}
+              onClick={() => setSelectedFest(fest)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                active
+                  ? 'text-white shadow-lg'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300'
+              }`}
+              style={active ? { background: getActiveGradient(fest) } : {}}
+            >
+              <Icon size={15} className={active ? 'text-white' : 'text-slate-400'} />
+              {fest}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
+                active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {festFCs(fest).length}/2
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* ── Assigned FCs panel */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="font-bold text-slate-700">Assigned to {selectedFest}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {festFCs(selectedFest).length}/2 slots filled
+            </p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {festFCs(selectedFest).length === 0 ? (
+              <div className="py-12 text-center">
+                <Star size={32} className="text-slate-200 mx-auto mb-3" />
+                <p className="text-sm text-slate-400">No FCs assigned for {selectedFest}</p>
+              </div>
+            ) : (
+              festFCs(selectedFest).map(fc => (
+                <div key={fc.memberId} className="flex items-center gap-4 px-5 py-4">
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${festColors[selectedFest]} flex items-center justify-center flex-shrink-0`}>
+                    <span className="text-white font-bold text-xs">
+                      {fc.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-700 text-sm">{fc.fullName}</p>
+                    <p className="text-xs text-slate-400">{fc.studentRoll} · {fc.email}</p>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Since {new Date(fc.assignedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => { setConfirmRemoveId(fc.memberId); setRemoveError(''); }}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors flex-shrink-0"
+                    title="Remove FC"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ── Add FC panel */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <h3 className="font-bold text-slate-700 mb-1">Add New FC for {selectedFest}</h3>
+          <p className="text-xs text-slate-400 mb-4">Search by roll number or email</p>
+
+          {canAdd(selectedFest) ? (
+            <LiveStudentSearch
+              fest={selectedFest}
+              festId={festIdMap[selectedFest] || ''}
+              fcList={fcList}
+              currentUserId={currentUserId}
+              onAdd={handleSelect}
+            />
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+              <AlertTriangle size={20} className="text-amber-500 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-amber-700">
+                Maximum 2 FCs reached for {selectedFest}
+              </p>
+              <p className="text-xs text-amber-500 mt-1">Remove an existing FC to add a new one</p>
+            </div>
+          )}
+
+          <div className="mt-4 p-4 bg-violet-50 rounded-xl border border-violet-100">
+            <p className="text-xs text-violet-700 leading-relaxed">
+              <strong>Note:</strong> Assigned FCs receive the role{' '}
+              <code className="bg-violet-100 px-1 rounded">{selectedFest}_FC</code> and can verify
+              fest reimbursement claims. Removing them will revoke this role.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Confirm Remove Modal */}
+      {confirmRemoveId && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-500" />
+              </div>
+              <div>
+                <h4 className="font-bold text-slate-800">Remove FC?</h4>
+                <p className="text-slate-500 text-sm">
+                  Their <strong>{selectedFest}_FC</strong> role will be revoked and they will be
+                  set back to STUDENT.
+                </p>
+              </div>
+            </div>
+
+            {removeError && (
+              <p className="text-red-500 text-xs mb-3 flex items-center gap-1">
+                <XCircle size={13} /> {removeError}
+              </p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setConfirmRemoveId(null); setRemoveError(''); }}
+                disabled={removeLoading}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-bold text-slate-600 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRemove(confirmRemoveId)}
+                disabled={removeLoading}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 transition-colors"
+              >
+                {removeLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                {removeLoading ? 'Removing…' : 'Yes, Remove'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Approve Reimbursements ────────────────────────────────────────────────────
-function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; setClaims: React.Dispatch<React.SetStateAction<Claim[]>> }) {
+function ApproveReimbursementsPage({
+  claims,
+  setClaims,
+}: {
+  claims: Claim[];
+  setClaims: React.Dispatch<React.SetStateAction<Claim[]>>;
+}) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [festFilter, setFestFilter] = useState<FestName | 'All'>('All');
   const [search, setSearch] = useState('');
@@ -784,15 +839,25 @@ function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; set
   const queue = claims.filter(c => c.status === 'verified');
   const filtered = queue.filter(c => {
     const ms = search.toLowerCase();
-    return (festFilter === 'All' || c.festName === festFilter) &&
-      (c.studentName.toLowerCase().includes(ms) || c.claimRefId.toLowerCase().includes(ms) || c.studentRoll.toLowerCase().includes(ms));
+    return (
+      (festFilter === 'All' || c.festName === festFilter) &&
+      (
+        c.studentName.toLowerCase().includes(ms) ||
+        c.claimRefId.toLowerCase().includes(ms) ||
+        c.studentRoll.toLowerCase().includes(ms)
+      )
+    );
   });
 
   const handleApprove = (id: string) => {
-    setClaims(prev => prev.map(c => c._id === id ? { ...c, status: 'approved', approvedAt: new Date().toISOString() } : c));
+    setClaims(prev =>
+      prev.map(c => c._id === id ? { ...c, status: 'approved', approvedAt: new Date().toISOString() } : c)
+    );
   };
   const handleReject = (id: string, reason: string) => {
-    setClaims(prev => prev.map(c => c._id === id ? { ...c, status: 'rejected', rejectionReason: reason, rejectedAt: new Date().toISOString() } : c));
+    setClaims(prev =>
+      prev.map(c => c._id === id ? { ...c, status: 'rejected', rejectionReason: reason, rejectedAt: new Date().toISOString() } : c)
+    );
   };
 
   return (
@@ -810,13 +875,25 @@ function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; set
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, roll no., ref ID..."
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name, roll no., ref ID..."
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           {(['All', ...FESTS] as (FestName | 'All')[]).map(f => (
-            <button key={f} onClick={() => setFestFilter(f)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${festFilter === f ? 'bg-violet-600 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-violet-300'}`}>
+            <button
+              key={f}
+              onClick={() => setFestFilter(f)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+                festFilter === f
+                  ? 'bg-violet-600 text-white'
+                  : 'bg-white border border-slate-200 text-slate-500 hover:border-violet-300'
+              }`}
+            >
               {f}
             </button>
           ))}
@@ -836,7 +913,9 @@ function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; set
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Ref ID', 'Student', 'Fest', 'Amount', 'FC Note', 'Action'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -850,7 +929,9 @@ function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; set
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       {claim.festName && (
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">{claim.festName}</span>
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">
+                          {claim.festName}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -860,8 +941,10 @@ function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; set
                       <p className="text-xs text-slate-500 truncate">{claim.fcComment ?? '—'}</p>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <button onClick={() => setSelected(claim)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors">
+                      <button
+                        onClick={() => setSelected(claim)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors"
+                      >
                         <Eye size={13} /> Review
                       </button>
                     </td>
@@ -874,15 +957,27 @@ function ApproveReimbursementsPage({ claims, setClaims }: { claims: Claim[]; set
       )}
 
       {selected && (
-        <ClaimReviewPanel claim={selected} department="fest" onClose={() => setSelected(null)}
-          onApprove={handleApprove} onReject={handleReject} mode="approve" />
+        <ClaimReviewPanel
+          claim={selected}
+          department="fest"
+          onClose={() => setSelected(null)}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          mode="approve"
+        />
       )}
     </div>
   );
 }
 
 // ─── Verified Reimbursements ───────────────────────────────────────────────────
-function VerifiedPage({ claims, setClaims }: { claims: Claim[]; setClaims: React.Dispatch<React.SetStateAction<Claim[]>> }) {
+function VerifiedPage({
+  claims,
+  setClaims,
+}: {
+  claims: Claim[];
+  setClaims: React.Dispatch<React.SetStateAction<Claim[]>>;
+}) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected' | 'disbursed'>('all');
@@ -890,8 +985,10 @@ function VerifiedPage({ claims, setClaims }: { claims: Claim[]; setClaims: React
   const verified = claims.filter(c => ['approved', 'rejected', 'disbursed'].includes(c.status));
   const filtered = verified.filter(c => {
     const ms = search.toLowerCase();
-    return (statusFilter === 'all' || c.status === statusFilter) &&
-      (c.studentName.toLowerCase().includes(ms) || c.claimRefId.toLowerCase().includes(ms));
+    return (
+      (statusFilter === 'all' || c.status === statusFilter) &&
+      (c.studentName.toLowerCase().includes(ms) || c.claimRefId.toLowerCase().includes(ms))
+    );
   });
 
   const handleUnverify = (id: string) => {
@@ -908,13 +1005,24 @@ function VerifiedPage({ claims, setClaims }: { claims: Claim[]; setClaims: React
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search claims..."
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search claims..."
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          />
         </div>
         <div className="flex gap-2 overflow-x-auto">
           {(['all', 'approved', 'rejected', 'disbursed'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'bg-violet-600 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-violet-300'}`}>
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 transition-colors ${
+                statusFilter === s
+                  ? 'bg-violet-600 text-white'
+                  : 'bg-white border border-slate-200 text-slate-500 hover:border-violet-300'
+              }`}
+            >
               {s}
             </button>
           ))}
@@ -923,14 +1031,18 @@ function VerifiedPage({ claims, setClaims }: { claims: Claim[]; setClaims: React
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="py-16 text-center text-slate-400"><p className="text-sm">No claims found</p></div>
+          <div className="py-16 text-center text-slate-400">
+            <p className="text-sm">No claims found</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Ref ID', 'Student', 'Fest', 'Amount', 'Status', 'Date', 'Action'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -945,18 +1057,28 @@ function VerifiedPage({ claims, setClaims }: { claims: Claim[]; setClaims: React
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className="text-xs font-semibold text-violet-600">{claim.festName}</span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-bold text-violet-700">₹{claim.amount.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap font-bold text-violet-700">
+                      ₹{claim.amount.toLocaleString('en-IN')}
+                    </td>
                     <td className="px-4 py-3.5"><StatusBadge status={claim.status} /></td>
                     <td className="px-4 py-3.5 text-xs text-slate-400 whitespace-nowrap">
                       {new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setSelected(claim)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                        <button
+                          onClick={() => setSelected(claim)}
+                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                          title="View"
+                        >
                           <Eye size={14} />
                         </button>
                         {claim.status === 'approved' && (
-                          <button onClick={() => handleUnverify(claim._id)} className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Revert to Verified">
+                          <button
+                            onClick={() => handleUnverify(claim._id)}
+                            className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Revert to Verified"
+                          >
                             <RotateCcw size={14} />
                           </button>
                         )}
@@ -971,7 +1093,12 @@ function VerifiedPage({ claims, setClaims }: { claims: Claim[]; setClaims: React
       </div>
 
       {selected && (
-        <ClaimReviewPanel claim={selected} department="fest" onClose={() => setSelected(null)} mode="view" />
+        <ClaimReviewPanel
+          claim={selected}
+          department="fest"
+          onClose={() => setSelected(null)}
+          mode="view"
+        />
       )}
     </div>
   );
@@ -982,8 +1109,14 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   const [activeView, setActiveView] = useState('overview');
   const [user, setUser] = useState<SecretaryUser | null>(null);
   const [claims, setClaims] = useState<Claim[]>(mockClaims);
-  const [fcList, setFcList] = useState<FestCoordinator[]>(mockFCList);
 
+  // ── FC state — now fetched from DB, not hardcoded
+  const [fcList, setFcList] = useState<FestCoordinator[]>([]);
+  const [festIdMap, setFestIdMap] = useState<Record<string, string>>({}); // { Celesta: '<ObjectId>', ... }
+  const [fcLoading, setFcLoading] = useState(true);
+  const [fcError, setFcError] = useState('');
+
+  // ── Load logged-in user from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (stored) {
@@ -1012,25 +1145,113 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
     setUser(mockUser);
   }, []);
 
+  // ── Fetch fests + active FCs from DB on mount
+  useEffect(() => {
+    const fetchFestData = async () => {
+      setFcLoading(true);
+      setFcError('');
+      try {
+        // 1. Fetch all fests → build { festName: ObjectId } map
+        const festRes = await fetch(`${BASE}/api/fests`);
+        if (!festRes.ok) throw new Error('Failed to load fests from database.');
+        const fests: { _id: string; name: string }[] = await festRes.json();
+        const map: Record<string, string> = {};
+        fests.forEach(f => { map[f.name] = f._id; });
+        setFestIdMap(map);
+
+        // 2. Fetch active FEST_COORDINATOR members for current academic year
+        const fcRes = await fetch(`${BASE}/api/fest-members/fcs`);
+        if (!fcRes.ok) throw new Error('Failed to load FC list from database.');
+        const members = await fcRes.json();
+
+        // Map DB shape → FestCoordinator shape used throughout the UI
+        const mapped: FestCoordinator[] = members.map((m: any) => ({
+          memberId: m._id,                    // FestMember document _id (used for removal)
+          userId: m.user._id,                 // User document _id
+          fullName: m.user.fullName,
+          studentRoll: m.user.studentId,      // studentId field = roll number in your User model
+          email: m.user.email,
+          festName: m.fest?.name || '',       // populated from Fest collection
+          assignedAt: m.createdAt,
+          isActive: m.isActive,
+        }));
+        setFcList(mapped);
+
+      } catch (e: any) {
+        console.error('Fest data load error:', e);
+        setFcError(e.message || 'Could not load FC data. Check your connection.');
+      } finally {
+        setFcLoading(false);
+      }
+    };
+
+    fetchFestData();
+  }, []);
+
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: Home },
-    { id: 'appoint', label: 'Appoint FC', icon: Users },
-    { id: 'approve', label: 'Approve Reimb.', icon: CheckSquare },
-    { id: 'verified', label: 'Verified', icon: Archive },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'overview',  label: 'Overview',      icon: Home },
+    { id: 'appoint',   label: 'Appoint FC',    icon: Users },
+    { id: 'approve',   label: 'Approve Reimb.', icon: CheckSquare },
+    { id: 'verified',  label: 'Verified',       icon: Archive },
+    { id: 'profile',   label: 'Profile',        icon: User },
   ];
+
+  // ── Render appoint page with loading / error guard
+  const renderAppointPage = () => {
+    if (fcLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <Loader2 size={28} className="animate-spin text-violet-400" />
+          <p className="text-slate-400 text-sm">Loading coordinator data…</p>
+        </div>
+      );
+    }
+    if (fcError) {
+      return (
+        <div className="p-6 flex flex-col items-center justify-center h-64 gap-4">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 max-w-md text-center">
+            <XCircle size={28} className="text-red-400 mx-auto mb-2" />
+            <p className="text-red-700 font-semibold text-sm">{fcError}</p>
+            <p className="text-red-400 text-xs mt-1">
+              Make sure you've run <code className="bg-red-100 px-1 rounded">node seed-fests.js</code> once
+              to create the Fest documents in MongoDB.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-bold mx-auto"
+            >
+              <RefreshCw size={14} /> Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <AppointFCPage
+        fcList={fcList}
+        setFcList={setFcList}
+        festIdMap={festIdMap}
+        currentUserId={user?._id || ''}
+      />
+    );
+  };
 
   return (
     <SecretaryLayout
-      department="fest" navItems={navItems} activeView={activeView}
-      setActiveView={setActiveView} onLogout={onLogout} user={user ?? mockUser}
-      title="Cultural & Fest Cell" subtitle="Secretary Dashboard"
+      department="fest"
+      navItems={navItems}
+      activeView={activeView}
+      setActiveView={setActiveView}
+      onLogout={onLogout}
+      user={user ?? mockUser}
+      title="Cultural & Fest Cell"
+      subtitle="Secretary Dashboard"
     >
       {activeView === 'overview' && <OverviewPage claims={claims} fcList={fcList} />}
-      {activeView === 'appoint' && <AppointFCPage fcList={fcList} setFcList={setFcList} />}
-      {activeView === 'approve' && <ApproveReimbursementsPage claims={claims} setClaims={setClaims} />}
+      {activeView === 'appoint'  && renderAppointPage()}
+      {activeView === 'approve'  && <ApproveReimbursementsPage claims={claims} setClaims={setClaims} />}
       {activeView === 'verified' && <VerifiedPage claims={claims} setClaims={setClaims} />}
-      {activeView === 'profile' && <DynamicProfilePage user={user} setUser={setUser} />}
+      {activeView === 'profile'  && <DynamicProfilePage user={user} setUser={setUser} />}
     </SecretaryLayout>
   );
 }

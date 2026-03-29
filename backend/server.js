@@ -10,6 +10,7 @@ const User = require('./models/user');
 const Claim = require('./models/messClaim');
 const RefundRequest = require('./models/refundRequest');
 const { ServerSettings } = require('./models/superadmin_setting');
+const { Fest, FestMember } = require('./models/fest'); // ← NEW
 
 const app = express();
 const multer = require('multer');
@@ -319,7 +320,6 @@ app.get('/api/users/admin/profile', async (req, res) => {
 });
 
 // ─── SEARCH USER BY ROLL NUMBER OR EMAIL ─────────────────────────────────────
-// Used by the Appoint FC feature to look up a student before assigning them.
 app.get('/api/users/search', async (req, res) => {
   try {
     const { query } = req.query;
@@ -350,7 +350,6 @@ app.get('/api/users/search', async (req, res) => {
 });
 
 // ─── UPDATE USER ROLE ─────────────────────────────────────────────────────────
-// Used to assign FC roles (e.g. 'Celesta_FC') or revert back to 'STUDENT'.
 app.put('/api/users/:id/role', async (req, res) => {
   try {
     const { id } = req.params;
@@ -424,6 +423,162 @@ app.get('/api/dashboard/:studentId', async (req, res) => {
   } catch (err) {
     console.error("Dashboard Fetch Error:", err);
     res.status(500).json({ message: "Server error fetching dashboard data." });
+  }
+});
+
+// ─── GET ALL FESTS ─────────────────────────────────────────────────────────────
+// Returns all fests so frontend can build festName → ObjectId map
+app.get('/api/fests', async (req, res) => {
+  try {
+    const fests = await Fest.find({}).sort({ name: 1 });
+    res.status(200).json(fests);
+  } catch (error) {
+    console.error("Error fetching fests:", error);
+    res.status(500).json({ message: "Server error while fetching fests." });
+  }
+});
+
+// ─── GET ALL ACTIVE FCs (FEST_COORDINATOR position, current academic year) ────
+// Used by AppointFCPage to populate FC list dynamically from FestMember collection
+app.get('/api/fest-members/fcs', async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear();
+    // Academic year logic: if month >= July, it's currentYear-nextYear, else prevYear-currentYear
+    const month = new Date().getMonth(); // 0-indexed
+    const academicYear = month >= 6
+      ? `${currentYear}-${String(currentYear + 1).slice(2)}`
+      : `${currentYear - 1}-${String(currentYear).slice(2)}`;
+
+    const members = await FestMember.find({
+      position: 'FEST_COORDINATOR',
+      isActive: true,
+      academicYear,
+    })
+      .populate('user', 'fullName studentId email phone department')
+      .populate('fest', 'name')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(members);
+  } catch (error) {
+    console.error("Error fetching FCs:", error);
+    res.status(500).json({ message: "Server error while fetching FCs." });
+  }
+});
+
+// ─── ASSIGN FC ─────────────────────────────────────────────────────────────────
+// Creates a FestMember document and updates the user's role field
+app.post('/api/fest-members/assign-fc', async (req, res) => {
+  try {
+    const { userId, festId, festName, addedBy } = req.body;
+
+    // Validate required fields
+    if (!userId || !festId || !festName) {
+      return res.status(400).json({ message: "userId, festId, and festName are required." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "Invalid userId." });
+    }
+    if (!mongoose.Types.ObjectId.isValid(festId)) {
+      return res.status(400).json({ message: "Invalid festId." });
+    }
+
+    // Compute current academic year
+    const currentYear = new Date().getFullYear();
+    const month = new Date().getMonth();
+    const academicYear = month >= 6
+      ? `${currentYear}-${String(currentYear + 1).slice(2)}`
+      : `${currentYear - 1}-${String(currentYear).slice(2)}`;
+
+    // Check if user already assigned as FC for this fest this year
+    const existing = await FestMember.findOne({
+      user: userId,
+      fest: festId,
+      academicYear,
+      isActive: true,
+    });
+    if (existing) {
+      return res.status(400).json({ message: "This student is already an FC for this fest." });
+    }
+
+    // Enforce max 2 FCs per fest per academic year
+    const count = await FestMember.countDocuments({
+      fest: festId,
+      position: 'FEST_COORDINATOR',
+      academicYear,
+      isActive: true,
+    });
+    if (count >= 2) {
+      return res.status(400).json({ message: "Maximum 2 FCs already assigned for this fest." });
+    }
+
+    // Validate addedBy if provided
+    const addedByValue = addedBy && mongoose.Types.ObjectId.isValid(addedBy) ? addedBy : null;
+
+    // Create FestMember record
+    const newMember = new FestMember({
+      user: userId,
+      fest: festId,
+      position: 'FEST_COORDINATOR',
+      academicYear,
+      addedBy: addedByValue,
+      isActive: true,
+    });
+    await newMember.save();
+
+    // Update user role to e.g. "Celesta_FC"
+    const roleName = `${festName}_FC`;
+    await User.findByIdAndUpdate(userId, { $set: { role: roleName } });
+
+    // Return populated member for frontend use
+    const populated = await FestMember.findById(newMember._id)
+      .populate('user', 'fullName studentId email phone department')
+      .populate('fest', 'name');
+
+    res.status(201).json({
+      message: `${festName} FC assigned successfully!`,
+      member: populated,
+    });
+
+  } catch (error) {
+    console.error("Assign FC error:", error);
+    // Duplicate key from the unique index on { user, fest, academicYear }
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "This student is already assigned to this fest for the current year." });
+    }
+    res.status(500).json({ message: "Server error while assigning FC." });
+  }
+});
+
+// ─── REMOVE FC ─────────────────────────────────────────────────────────────────
+// Soft-deletes the FestMember record and reverts the user's role back to STUDENT
+app.delete('/api/fest-members/:memberId/remove-fc', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(memberId)) {
+      return res.status(400).json({ message: "Invalid member ID." });
+    }
+
+    const member = await FestMember.findById(memberId).populate('user', '_id fullName');
+    if (!member) {
+      return res.status(404).json({ message: "FC record not found." });
+    }
+
+    // Soft-delete: mark isActive false instead of deleting
+    member.isActive = false;
+    await member.save();
+
+    // Revert user role back to STUDENT
+    await User.findByIdAndUpdate(member.user._id, { $set: { role: 'STUDENT' } });
+
+    res.status(200).json({
+      message: `FC removed. ${member.user.fullName}'s role reverted to STUDENT.`,
+    });
+
+  } catch (error) {
+    console.error("Remove FC error:", error);
+    res.status(500).json({ message: "Server error while removing FC." });
   }
 });
 

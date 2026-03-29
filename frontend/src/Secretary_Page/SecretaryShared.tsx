@@ -317,20 +317,8 @@ export function SecretaryLayout({
                 <p className="text-xs text-white/70 hidden sm:block">{subtitle}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {user && (
-                <div className="hidden sm:flex items-center gap-2 bg-white/15 rounded-xl px-3 py-2">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style={{ background: 'rgba(255,255,255,0.3)' }}>
-                    {user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                  </div>
-                  <span className="text-white text-sm font-medium">{user.fullName.split(' ')[0]}</span>
-                </div>
-              )}
-              <button onClick={onLogout} className="flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl text-sm font-medium transition-colors">
-                <LogOut size={16} />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
-            </div>
+            {/* Top right corner cleared to match Admin layout */}
+            <div className="flex items-center gap-2"></div>
           </div>
         </div>
 
@@ -338,7 +326,7 @@ export function SecretaryLayout({
         <div className="flex-1 overflow-y-auto">
           {children}
         </div>
-
++
         {/* Mobile Bottom Nav */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40"
           style={{ background: cfg.sidebarBg, borderTop: `1px solid rgba(255,255,255,0.1)` }}>
