@@ -48,7 +48,7 @@ export function FestReimbursementForm({ isOpen, onClose, onBack, onSubmit }: Fes
     if (!files) return;
 
     const newFiles = Array.from(files).filter((file) => {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       if (!validTypes.includes(file.type)) {
         alert(`${file.name} is not a valid file type. Please upload images or PDFs.`);
         return false;
@@ -99,11 +99,11 @@ export function FestReimbursementForm({ isOpen, onClose, onBack, onSubmit }: Fes
     if (!festName.trim()) newErrors.festName = 'Fest name is required';
     if (!team) newErrors.team = 'Please select a team';
     // ✅ NEW CODE
-    const transactionRegex = /^\d{12}$/; // Regex that strictly checks for exactly 12 numbers
+    const transactionRegex = /^[A-Za-z0-9._/-]{6,30}$/;
     if (!transactionId.trim()) {
       newErrors.transactionId = 'Transaction ID is required';
     } else if (!transactionRegex.test(transactionId.trim())) {
-      newErrors.transactionId = 'Transaction ID must be exactly 12 numeric digits';
+      newErrors.transactionId = 'Enter a valid payment reference or bill number (6-30 letters/numbers)';
     }
     
     if (!expenseAmount || parseFloat(expenseAmount) <= 0) {
@@ -280,11 +280,12 @@ export function FestReimbursementForm({ isOpen, onClose, onBack, onSubmit }: Fes
                   setTransactionId(e.target.value);
                   setErrors((prev) => ({ ...prev, transactionId: '' }));
                 }}
-                placeholder="e.g., UPI Ref or Bill No."
+                placeholder="e.g., UPI Ref, bank ref, or bill no."
                 className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 transition-all ${
                   errors.transactionId ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
+              <p className="text-xs text-gray-500 mt-1">Accepted: 6-30 letters, numbers, `.`, `_`, `/`, `-`</p>
               {errors.transactionId && <p className="text-sm text-red-600 mt-1">{errors.transactionId}</p>}
             </div>
           </div>
@@ -342,7 +343,7 @@ export function FestReimbursementForm({ isOpen, onClose, onBack, onSubmit }: Fes
                 <input
                   type="file"
                   multiple
-                  accept="image/jpeg,image/jpg,image/png,image/gif,application/pdf"
+                  accept="image/jpeg,image/jpg,image/png,application/pdf"
                   onChange={(e) => handleFileSelect(e.target.files)}
                   className="hidden"
                   id="file-upload"

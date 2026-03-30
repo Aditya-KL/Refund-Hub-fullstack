@@ -203,25 +203,44 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   // ─── Form Submit Handlers ─────────────────────────────────────────────────
 
   const handleMessRebateSubmit = (data: MessRebateFormData) => {
-    setShowMessRebateForm(false);
+    const submit = async () => {
+      try {
+        const formData = new FormData();
+        formData.append('studentId', loggedInUser.studentId);
+        formData.append('fromDate', data.fromDate?.toISOString() || '');
+        formData.append('toDate', data.toDate?.toISOString() || '');
+        formData.append('reason', data.reason);
+        data.receiptFiles.forEach((file) => formData.append('receiptFiles', file));
 
-    const days =
-      data.fromDate && data.toDate
-        ? Math.ceil(
-            Math.abs(data.toDate.getTime() - data.fromDate.getTime()) /
-              (1000 * 60 * 60 * 24)
-          ) + 1
-        : 0;
+        const response = await fetch(`${BASE_URL}/api/claims/mess`, {
+          method: 'POST',
+          body: formData,
+        });
 
-    setSuccessClaimData({
-      claimId: `CLM-2024-${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`,
-      type: 'Mess Rebate',
-      amount: days * 150,
-      fromDate: data.fromDate,
-      toDate: data.toDate,
-      submissionDate: new Date(),
-    });
-    setShowSuccessConfirmation(true);
+        const result = await response.json();
+
+        if (!response.ok) {
+          alert('Submission failed: ' + result.message);
+          return;
+        }
+
+        setShowMessRebateForm(false);
+        setSuccessClaimData({
+          claimId: result.claim.claimId,
+          type: 'Mess Rebate',
+          amount: result.claim.amount,
+          fromDate: data.fromDate,
+          toDate: data.toDate,
+          submissionDate: new Date(result.claim.createdAt),
+        });
+        setShowSuccessConfirmation(true);
+      } catch (error) {
+        console.error('Error submitting mess rebate:', error);
+        alert('Could not connect to the server.');
+      }
+    };
+
+    submit();
   };
 
   const handleFestReimbursementSubmit = async (data: FestReimbursementFormData) => {
@@ -261,15 +280,45 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
     }
   };
 
-  const handleMedicalRebateSubmit = (data: MedicalRebateFormData) => {
-    setShowMedicalRebateForm(false);
-    setSuccessClaimData({
-      claimId: `CLM-2024-${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`,
-      type: 'Medical Rebate',
-      amount: data.amount,
-      submissionDate: new Date(),
-    });
-    setShowSuccessConfirmation(true);
+  const handleMedicalRebateSubmit = async (data: MedicalRebateFormData) => {
+    try {
+      const formData = new FormData();
+      formData.append('studentId', loggedInUser.studentId);
+      formData.append('hospitalName', data.hospitalName);
+      formData.append('treatmentDate', data.treatmentDate?.toISOString() || '');
+      formData.append('amount', data.amount.toString());
+      formData.append('description', data.description);
+      data.billFiles.forEach((file) => formData.append('receiptFiles', file));
+
+      const response = await fetch(`${BASE_URL}/api/claims/hospital`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      let result: any = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
+
+      if (!response.ok) {
+        alert('Submission failed: ' + (result?.message || `HTTP ${response.status}`));
+        return;
+      }
+
+      setShowMedicalRebateForm(false);
+      setSuccessClaimData({
+        claimId: result.claim.claimId,
+        type: 'Medical Rebate',
+        amount: result.claim.amount,
+        submissionDate: new Date(result.claim.createdAt),
+      });
+      setShowSuccessConfirmation(true);
+    } catch (error) {
+      console.error('Error submitting medical rebate:', error);
+      alert('Upload failed before the server could finish reading the file. This usually means the browser connection was interrupted, the frontend/backend origin pair did not match cleanly, or the file stream got cut off. Retry on http://localhost:5173 with one small file first.');
+    }
   };
 
   // ─── Page Title ───────────────────────────────────────────────────────────

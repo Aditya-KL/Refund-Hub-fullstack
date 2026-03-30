@@ -17,6 +17,67 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'application/pdf',
+];
+
+const serializeUser = (user) => {
+  const rawUser = user?.toObject ? user.toObject() : user;
+  const nestedBankDetails = rawUser?.studentProfile?.bankDetails || {};
+  const flatBankDetails = rawUser?.bankDetails || {};
+  return {
+    _id: rawUser._id,
+    fullName: rawUser.fullName,
+    studentId: rawUser.studentId,
+    email: rawUser.email,
+    isSuperAdmin: rawUser.isSuperAdmin || false,
+    isSecretary: rawUser.isSecretary || false,
+    department: rawUser.department || 'general',
+    institution: rawUser.institution || '',
+    phone: rawUser.phone || '',
+    hostel: rawUser.hostel || '',
+    block: rawUser.block || '',
+    roomNumber: rawUser.roomNumber || '',
+    admissionYear: rawUser.admissionYear || '',
+    messName: rawUser.messName || '',
+    profilePicUrl: rawUser.profilePicUrl || '',
+    bankDetails: {
+      accountHolderName: nestedBankDetails.accountHolderName || flatBankDetails.accountHolderName || '',
+      bankName: nestedBankDetails.bankName || flatBankDetails.bankName || '',
+      accountNumber: nestedBankDetails.accountNumber || flatBankDetails.accountNumber || '',
+      ifscCode: nestedBankDetails.ifscCode || flatBankDetails.ifscCode || ''
+    }
+  };
+};
+
+const createClaimId = (prefix = 'CLM') => {
+  const year = new Date().getFullYear();
+  const random = Math.floor(100000 + Math.random() * 900000);
+  return `${prefix}-${year}-${random}`;
+};
+
+const mapUploadedFilesToAttachments = (files = []) =>
+  files.map((file) => ({
+    filename: file.originalname || file.filename,
+    url: file.secure_url || file.path || file.url,
+    mimetype: file.mimetype,
+    uploadedAt: new Date(),
+  }));
+
+const normalizeClaim = (claimDoc) => {
+  const claim = claimDoc.toObject ? claimDoc.toObject() : claimDoc;
+  const attachments = Array.isArray(claim.attachments) ? claim.attachments : [];
+  return {
+    ...claim,
+    attachments,
+    receiptUrls: attachments.map((attachment) => attachment.url).filter(Boolean),
+  };
+};
+
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -35,14 +96,35 @@ cloudinary.config({
 // 2. Set up the Storage Engine
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
+  params: async (_req, file) => ({
     folder: 'RefundHub_Receipts',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'pdf']
-  }
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
+    public_id: `${Date.now()}-${(file.originalname || 'upload').replace(/[^a-zA-Z0-9._-]/g, '_')}`,
+  })
 });
 
 // 3. Create the upload middleware
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_UPLOAD_SIZE, files: 5 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      return cb(new Error('Only JPG, JPEG, PNG, and PDF files are allowed.'));
+    }
+    cb(null, true);
+  }
+});
+
+const getUploadErrorMessage = (err) => {
+  if (!err) return 'File upload failed.';
+  if (err.code === 'LIMIT_FILE_SIZE') return 'Each file must be 5MB or smaller.';
+  if (err.code === 'LIMIT_FILE_COUNT') return 'You can upload at most 5 files.';
+  if (err.message?.includes('aborted')) {
+    return 'Upload was interrupted before the file finished reaching the server. Please retry with a stable connection or a smaller file.';
+  }
+  return `File upload failed: ${err.message}`;
+};
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -51,6 +133,36 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS
   }
 });
+
+const sendVerificationEmail = async ({ email, fullName, token }) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    throw new Error('Email service is not configured. Set EMAIL_USER and EMAIL_PASS.');
+  }
+
+  const backendBaseUrl = process.env.BACKEND_URL || process.env.VITE_BASE_URL || `http://127.0.0.1:${process.env.PORT || 8000}`;
+  const verificationUrl = `${backendBaseUrl.replace(/\/$/, '')}/api/verify/${token}`;
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: email,
+    subject: 'Verify your Refund Hub account',
+    text: `Hello ${fullName}, verify your account here: ${verificationUrl}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+        <h2 style="color: #166534;">Verify your Refund Hub account</h2>
+        <p>Hello ${fullName},</p>
+        <p>Please confirm your email address to activate your account.</p>
+        <p>
+          <a href="${verificationUrl}" style="display:inline-block;padding:12px 18px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
+            Verify Email
+          </a>
+        </p>
+        <p>If the button does not work, open this link:</p>
+        <p><a href="${verificationUrl}">${verificationUrl}</a></p>
+      </div>
+    `
+  });
+};
 
 transporter.verify((error, success) => {
   if (error) {
@@ -61,12 +173,21 @@ transporter.verify((error, success) => {
   }
 });
 
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.FRONTEND_URL,
+  process.env.VITE_FRONTEND_URL,
+].filter(Boolean));
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    process.env.VITE_BASE_URL
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type"]
 }));
 app.use(express.json());
@@ -87,6 +208,12 @@ app.post('/api/register', async (req, res) => {
     const rollRegex = /^[12][0-9][012][123](AI|CB|CE|CS|CT|EC|EE|ES|MC|ME|MM|PH|PR|CM|GT|MT|PC|ST|VL)[0-9]{2}$/i;
     if (!rollRegex.test(studentId)) {
       return res.status(400).json({ message: "Invalid roll number format!" });
+    }
+    if (!/^\d{11,16}$/.test(String(accountNumber || '').trim())) {
+      return res.status(400).json({ message: "Account number must be 11 to 16 digits because bank formats vary." });
+    }
+    if (!/^[A-Z]{4}\d{7}$/i.test(String(ifscCode || '').trim())) {
+      return res.status(400).json({ message: "Invalid IFSC code format." });
     }
 
     const existingUser = await User.findOne({
@@ -116,11 +243,23 @@ app.post('/api/register', async (req, res) => {
     });
 
     await newUser.save();
+
+    try {
+      await sendVerificationEmail({
+        email: newUser.email,
+        fullName: newUser.fullName,
+        token
+      });
+    } catch (mailError) {
+      await User.deleteOne({ _id: newUser._id });
+      throw mailError;
+    }
+
     res.status(201).json({ message: "Registration successful! Check your email." });
 
   } catch (err) {
     console.error("Registration Error:", err);
-    res.status(500).json({ message: "Server error during registration." });
+    res.status(500).json({ message: err.message || "Server error during registration." });
   }
 });
 
@@ -150,22 +289,7 @@ app.post('/api/login', async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
-      user: {
-        _id: user._id,
-        fullName: user.fullName,
-        studentId: user.studentId,
-        email: user.email,
-        isSuperAdmin: user.isSuperAdmin || false,
-        isSecretary: user.isSecretary || false,
-        department: user.department || "general",
-        phone: user.phone || "",
-        bankDetails: {
-          accountHolderName: user.bankDetails?.accountHolderName || "",
-          bankName: user.bankDetails?.bankName || "",
-          accountNumber: user.bankDetails?.accountNumber || "",
-          ifscCode: user.bankDetails?.ifscCode || ""
-        }
-      }
+      user: serializeUser(user)
     });
 
   } catch (error) {
@@ -181,7 +305,7 @@ app.post('/api/claims/fest', async (req, res) => {
   uploadMiddleware(req, res, async function (err) {
     if (err) {
       console.error("Multer/Cloudinary Error:", err);
-      return res.status(400).json({ message: "File upload failed: " + err.message });
+      return res.status(400).json({ message: getUploadErrorMessage(err) });
     }
 
     try {
@@ -190,26 +314,30 @@ app.post('/api/claims/fest', async (req, res) => {
       const user = await User.findOne({ studentId: String(studentId).toUpperCase() });
       if (!user) return res.status(404).json({ message: "User not found." });
 
-      const fileUrls = req.files ? req.files.map(file => file.secure_url || file.path || file.url) : [];
+      const attachments = mapUploadedFilesToAttachments(req.files);
 
-      const claimId = `CLM-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100).padStart(3, '0')}`;
+      if (attachments.length === 0) {
+        return res.status(400).json({ message: "At least one document is required for fest claims." });
+      }
 
       const newClaim = new RefundRequest({
-        claimId: claimId,
+        claimId: createClaimId('FEST'),
         student: user._id,
+        studentRoll: user.studentId,
         requestType: 'FEST_REIMBURSEMENT',
         festName: festName,
         teamName: team,
+        title: `${festName} Reimbursement`,
         amount: expenseAmount,
         transactionId: transactionId,
         description: expenseDescription,
-        receiptUrls: fileUrls,
+        attachments,
         status: 'PENDING_TEAM_COORD',
-        history: [{ action: 'SUBMITTED', by: user.fullName }]
+        history: [{ action: 'SUBMITTED', byUser: user._id, byName: user.fullName, comments: 'Claim applied' }]
       });
 
       await newClaim.save();
-      res.status(201).json({ message: "Claim submitted!", claim: newClaim });
+      res.status(201).json({ message: "Claim submitted!", claim: normalizeClaim(newClaim) });
 
     } catch (dbErr) {
       console.error("Database Error:", dbErr);
@@ -217,6 +345,130 @@ app.post('/api/claims/fest', async (req, res) => {
         return res.status(400).json({ message: "This Transaction ID has already been used for another claim." });
       }
       res.status(500).json({ message: "Server error while saving claim to database." });
+    }
+  });
+});
+
+app.post('/api/claims/mess', async (req, res) => {
+  const uploadMiddleware = upload.array('receiptFiles', 5);
+
+  uploadMiddleware(req, res, async function (err) {
+    if (err) {
+      console.error("Multer/Cloudinary Error:", err);
+      return res.status(400).json({ message: getUploadErrorMessage(err) });
+    }
+
+    try {
+      const { studentId, fromDate, toDate, reason } = req.body;
+
+      const user = await User.findOne({ studentId: String(studentId).toUpperCase() });
+      if (!user) return res.status(404).json({ message: "User not found." });
+
+      const absenceFrom = fromDate ? new Date(fromDate) : null;
+      const absenceTo = toDate ? new Date(toDate) : null;
+
+      if (!absenceFrom || Number.isNaN(absenceFrom.getTime())) {
+        return res.status(400).json({ message: "Valid from date is required." });
+      }
+      if (!absenceTo || Number.isNaN(absenceTo.getTime())) {
+        return res.status(400).json({ message: "Valid to date is required." });
+      }
+      if (absenceFrom > absenceTo) {
+        return res.status(400).json({ message: "To date must be after from date." });
+      }
+
+      const millisPerDay = 1000 * 60 * 60 * 24;
+      const absenceDays = Math.floor((absenceTo - absenceFrom) / millisPerDay) + 1;
+      if (absenceDays < 5) {
+        return res.status(400).json({ message: "Mess rebate is allowed only for absences of 5 days or more." });
+      }
+
+      const settings = await ServerSettings.getSettings();
+      const dailyRate = settings?.messRebateRateDaily || 150;
+      const attachments = mapUploadedFilesToAttachments(req.files);
+
+      const newClaim = new RefundRequest({
+        claimId: createClaimId('MESS'),
+        student: user._id,
+        studentRoll: user.studentId,
+        requestType: 'MESS_REBATE',
+        title: 'Mess Rebate Application',
+        description: reason,
+        amount: absenceDays * dailyRate,
+        attachments,
+        status: 'PENDING_MESS_MANAGER',
+        messAbsenceFrom: absenceFrom,
+        messAbsenceTo: absenceTo,
+        messAbsenceDays: absenceDays,
+        history: [{ action: 'SUBMITTED', byUser: user._id, byName: user.fullName, comments: 'Claim applied' }]
+      });
+
+      await newClaim.save();
+      res.status(201).json({ message: "Mess rebate submitted!", claim: normalizeClaim(newClaim) });
+    } catch (dbErr) {
+      console.error("Database Error:", dbErr);
+      res.status(500).json({ message: "Server error while saving mess rebate." });
+    }
+  });
+});
+
+app.post('/api/claims/hospital', async (req, res) => {
+  req.on('aborted', () => {
+    console.error('Hospital claim upload aborted by client before completion.');
+  });
+
+  const uploadMiddleware = upload.array('receiptFiles', 5);
+
+  uploadMiddleware(req, res, async function (err) {
+    if (err) {
+      console.error("Multer/Cloudinary Error:", err);
+      return res.status(400).json({ message: getUploadErrorMessage(err) });
+    }
+
+    try {
+      const { studentId, hospitalName, treatmentDate, amount, description } = req.body;
+
+      const user = await User.findOne({ studentId: String(studentId).toUpperCase() });
+      if (!user) return res.status(404).json({ message: "User not found." });
+
+      const claimTreatmentDate = treatmentDate ? new Date(treatmentDate) : null;
+      if (!hospitalName || !hospitalName.trim()) {
+        return res.status(400).json({ message: "Hospital name is required." });
+      }
+      if (!claimTreatmentDate || Number.isNaN(claimTreatmentDate.getTime())) {
+        return res.status(400).json({ message: "Valid treatment date is required." });
+      }
+      if (!amount || Number(amount) <= 0) {
+        return res.status(400).json({ message: "Valid amount is required." });
+      }
+
+      const attachments = mapUploadedFilesToAttachments(req.files);
+      if (attachments.length === 0) {
+        return res.status(400).json({ message: "At least one medical bill is required." });
+      }
+
+      const treatmentDateText = claimTreatmentDate.toISOString().split('T')[0];
+
+      const newClaim = new RefundRequest({
+        claimId: createClaimId('MED'),
+        student: user._id,
+        studentRoll: user.studentId,
+        requestType: 'MEDICAL_REBATE',
+        title: `Medical Rebate - ${hospitalName}`,
+        description: description?.trim()
+          ? `${hospitalName} | Treatment Date: ${treatmentDateText} | ${description.trim()}`
+          : `${hospitalName} | Treatment Date: ${treatmentDateText}`,
+        amount: Number(amount),
+        attachments,
+        status: 'PENDING_ACADEMIC',
+        history: [{ action: 'SUBMITTED', byUser: user._id, byName: user.fullName, comments: 'Claim applied' }]
+      });
+
+      await newClaim.save();
+      res.status(201).json({ message: "Medical rebate submitted!", claim: normalizeClaim(newClaim) });
+    } catch (dbErr) {
+      console.error("Database Error:", dbErr);
+      res.status(500).json({ message: "Server error while saving medical rebate." });
     }
   });
 });
@@ -248,7 +500,10 @@ app.get('/api/verify/:token', async (req, res) => {
 // ─── UNIFIED UPDATE ROUTE ─────────────────────────────────────────────────────
 app.put('/api/user/update', async (req, res) => {
   try {
-    const { _id, studentId, fullName, email, phone, institution } = req.body;
+    const {
+      _id, studentId, fullName, email, phone, institution,
+      department, hostel, block, roomNumber, admissionYear, messName, profilePicUrl, bankDetails
+    } = req.body;
 
     if (phone) {
       const phoneRegex = /^\d{10}$/;
@@ -274,10 +529,42 @@ app.put('/api/user/update', async (req, res) => {
     const user = await User.findOne(query);
     if (!user) return res.status(404).json({ message: "User not found in the database." });
 
-    const updateFields = { fullName, phone, institution };
+    const updateFields = {};
+
+    if (typeof fullName === 'string') updateFields.fullName = fullName;
+    if (typeof phone === 'string') updateFields.phone = phone;
+    if (typeof institution === 'string') updateFields.institution = institution;
+    if (typeof department === 'string') updateFields.department = department;
+    if (typeof hostel === 'string') updateFields.hostel = hostel;
+    if (typeof block === 'string') updateFields.block = block;
+    if (typeof roomNumber === 'string') updateFields.roomNumber = roomNumber;
+    if (typeof admissionYear === 'string') updateFields.admissionYear = admissionYear;
+    if (typeof messName === 'string') updateFields.messName = messName;
+    if (typeof profilePicUrl === 'string') updateFields.profilePicUrl = profilePicUrl;
 
     if (!user.isSuperAdmin && user.role !== 'SUPER_ADMIN') {
       if (email) updateFields.email = email.toLowerCase();
+    }
+
+    if (bankDetails && typeof bankDetails === 'object') {
+      if (bankDetails.accountNumber != null && !/^\d{11,16}$/.test(String(bankDetails.accountNumber))) {
+        return res.status(400).json({ message: "Account number must be 11 to 16 digits because bank formats vary." });
+      }
+      if (bankDetails.ifscCode != null && !/^[A-Z]{4}\d{7}$/i.test(String(bankDetails.ifscCode))) {
+        return res.status(400).json({ message: "Invalid IFSC code format." });
+      }
+      if (typeof bankDetails.accountHolderName === 'string') {
+        updateFields['studentProfile.bankDetails.accountHolderName'] = bankDetails.accountHolderName;
+      }
+      if (typeof bankDetails.bankName === 'string') {
+        updateFields['studentProfile.bankDetails.bankName'] = bankDetails.bankName;
+      }
+      if (typeof bankDetails.accountNumber === 'string') {
+        updateFields['studentProfile.bankDetails.accountNumber'] = bankDetails.accountNumber;
+      }
+      if (typeof bankDetails.ifscCode === 'string') {
+        updateFields['studentProfile.bankDetails.ifscCode'] = bankDetails.ifscCode.toUpperCase();
+      }
     }
 
     const updatedUser = await User.findOneAndUpdate(
@@ -288,12 +575,31 @@ app.put('/api/user/update', async (req, res) => {
 
     res.status(200).json({
       message: "Profile updated successfully!",
-      user: updatedUser
+      user: serializeUser(updatedUser)
     });
 
   } catch (err) {
     console.error("Update Error:", err.message);
     res.status(500).json({ message: "Server error during profile update." });
+  }
+});
+
+app.get('/api/users/:id/profile', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid user ID." });
+    }
+
+    const user = await User.findById(id).select('-password -verificationToken -resetPasswordToken');
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.status(200).json(serializeUser(user));
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({ message: "Server error while fetching user profile." });
   }
 });
 
@@ -390,7 +696,8 @@ app.get('/api/dashboard/:studentId', async (req, res) => {
     const user = await User.findOne({ studentId: req.params.studentId.toUpperCase() });
     if (!user) return res.status(404).json({ message: "User not found." });
 
-    const claims = await RefundRequest.find({ student: user._id }).sort({ createdAt: -1 });
+    const claimDocs = await RefundRequest.find({ student: user._id }).sort({ createdAt: -1 });
+    const claims = claimDocs.map(normalizeClaim);
 
     let totalRefunded = 0;
     let pendingCount = 0;

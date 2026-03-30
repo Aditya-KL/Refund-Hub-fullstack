@@ -104,6 +104,45 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
         });
         
         setTempAccount(storedBank.accountNumber || '');
+
+        const loadLatestProfile = async () => {
+            if (!userId) return;
+
+            try {
+                const latestUser = await apiService.getUserProfile(userId);
+                localStorage.setItem('user', JSON.stringify(latestUser));
+
+                setProfileData({
+                    fullName: latestUser.fullName || '',
+                    studentId: latestUser.studentId || '',
+                    email: latestUser.email || '',
+                    phone: latestUser.phone || '',
+                    profilePicUrl: latestUser.profilePicUrl || ''
+                });
+
+                setAcademicData({
+                    department: latestUser.department || '',
+                    hostel: latestUser.hostel || '',
+                    block: latestUser.block || '',
+                    roomNumber: latestUser.roomNumber || '',
+                    admissionYear: latestUser.admissionYear || '',
+                    messName: latestUser.messName || '',
+                });
+
+                const latestBank = latestUser.bankDetails || {};
+                setBankData({
+                    accountHolderName: latestBank.accountHolderName || '',
+                    bankName: latestBank.bankName || '',
+                    accountNumber: latestBank.accountNumber || '',
+                    ifscCode: latestBank.ifscCode || '',
+                });
+                setTempAccount(latestBank.accountNumber || '');
+            } catch (error) {
+                console.error('Failed to hydrate latest profile:', error);
+            }
+        };
+
+        loadLatestProfile();
     }, []);
 
     // --- ASYNC SAVE HANDLERS (DATABASE INTEGRATION) ---
@@ -116,12 +155,12 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
 
         try {
             // 1. Send data to MongoDB via our service
-            await apiService.updateUserData(userId, updates);
+            const response = await apiService.updateUserData(userId, updates);
 
             // 2. Keep local storage in sync so the rest of the app doesn't break
-            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-            const updatedUser = { ...storedUser, ...updates };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
+            if (response?.user) {
+                localStorage.setItem('user', JSON.stringify(response.user));
+            }
             
             // 3. Show success toast
             setSaveSuccess(true);

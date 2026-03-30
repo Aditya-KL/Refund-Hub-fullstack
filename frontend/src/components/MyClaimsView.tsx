@@ -49,7 +49,12 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
     if (status === 'PENDING_VP') verifier = 'VP (Gymkhana)';
     if (status === 'PENDING_ACADEMIC') verifier = 'Academic Office';
 
-    return { step: 2, text: 'Verifying', subtext: `Currently with: ${verifier}`, isError: false };
+    return { step: 1, text: 'Applied', subtext: `Queued for: ${verifier}`, isError: false };
+  };
+
+  const formatDateRange = (from?: string, to?: string) => {
+    if (!from || !to) return null;
+    return `${new Date(from).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} - ${new Date(to).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
   };
 
   if (isLoading) {
@@ -75,6 +80,8 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
         {claims.map((claim) => {
           const tracking = getTrackingDetails(claim.status);
           const isFest = claim.requestType === 'FEST_REIMBURSEMENT';
+          const isMess = claim.requestType === 'MESS_REBATE';
+          const messRange = formatDateRange(claim.messAbsenceFrom, claim.messAbsenceTo);
           
           return (
             <div key={claim._id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -83,9 +90,13 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mb-3 ${
-                    isFest ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-orange-50 text-orange-700 border border-orange-200'
+                    isFest
+                      ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                      : claim.requestType === 'MESS_REBATE'
+                      ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
-                    {isFest ? 'Fest/Activity' : 'Mess/Medical Rebate'}
+                    {isFest ? 'Fest/Activity' : claim.requestType === 'MESS_REBATE' ? 'Mess Rebate' : 'Medical Rebate'}
                   </span>
                   <h3 className="text-lg font-bold text-gray-900">
                     {isFest ? `${claim.festName} Reimbursement` : claim.requestType.replace('_', ' ')}
@@ -102,9 +113,11 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
                   <p className="text-sm font-semibold text-gray-900">{claim.claimId}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><Calendar size={14}/> Submitted</p>
+                  <p className="text-xs text-gray-500 mb-1 flex items-center gap-1"><Calendar size={14}/>{isMess ? 'Rebate Period' : 'Submitted'}</p>
                   <p className="text-sm font-semibold text-gray-900">
-                    {new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {isMess && messRange
+                      ? messRange
+                      : new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
                 <div>
@@ -124,6 +137,7 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
                   <div className="flex flex-col items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2 border-2 ${tracking.step >= 1 ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-300 text-gray-400'}`}>1</div>
                     <p className="text-xs font-bold text-gray-900">Applied</p>
+                    <p className="text-[10px] text-gray-500">{tracking.step === 1 && !tracking.isError ? tracking.subtext : 'Submitted'}</p>
                   </div>
                   <div className="flex flex-col items-center">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mb-2 border-2 ${tracking.isError ? 'bg-red-500 border-red-500 text-white' : tracking.step >= 2 ? 'bg-green-500 border-green-500 text-white' : 'bg-white border-gray-300 text-gray-400'}`}>
@@ -144,13 +158,13 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
               </div>
 
               {/* ✅ CHANGED: Now opens our custom image viewer instead of firing the alert! */}
-              {claim.receiptUrls && claim.receiptUrls.length > 0 && (
+              {((claim.receiptUrls && claim.receiptUrls.length > 0) || (claim.attachments && claim.attachments.length > 0)) && (
                 <button 
-                  onClick={() => setViewingReceipts(claim.receiptUrls)}
+                  onClick={() => setViewingReceipts((claim.receiptUrls || claim.attachments?.map((attachment: any) => attachment.url) || []).filter(Boolean))}
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 border border-green-600 text-green-700 rounded-lg hover:bg-green-50 transition-colors font-semibold text-sm"
                 >
                   <Eye size={18} />
-                  View Digital Records ({claim.receiptUrls.length} files)
+                  View Digital Records ({(claim.receiptUrls || claim.attachments || []).length} files)
                 </button>
               )}
             </div>

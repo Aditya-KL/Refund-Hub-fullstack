@@ -29,6 +29,13 @@ const userSchema = new mongoose.Schema({
   },
 
   department: { type: String, default: 'general' },
+  institution: { type: String, default: '' },
+  hostel: { type: String, default: '' },
+  block: { type: String, default: '' },
+  roomNumber: { type: String, default: '' },
+  admissionYear: { type: String, default: '' },
+  messName: { type: String, default: '' },
+  profilePicUrl: { type: String, default: '' },
   isVerified: { type: Boolean, default: false },
   isSecretary: { type: Boolean, default: false },
   isSuperAdmin: { type: Boolean, default: false },
@@ -38,7 +45,6 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: { type: Date },
 lastLogin: { type: Date, default: null }, 
   
-  createdAt: { type: Date, default: Date.now },
   // --- Student Specific Profile ---
   studentProfile: {
     bankDetails: {

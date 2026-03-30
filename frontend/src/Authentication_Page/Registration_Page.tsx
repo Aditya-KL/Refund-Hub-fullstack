@@ -112,8 +112,8 @@ export function StudentRegistrationForm({ onBack, onComplete }: StudentRegistrat
 
     if (!formData.accountNumber.trim()) {
       newErrors.accountNumber = 'Account number is required';
-    } else if (!/^\d{12}$/.test(formData.accountNumber)) {
-      newErrors.accountNumber = 'Account number must be exactly 12 digits';
+    } else if (!/^\d{11,16}$/.test(formData.accountNumber)) {
+      newErrors.accountNumber = 'Account number must be 11 to 16 digits because bank formats vary';
     }
 
     if (!formData.ifscCode.trim()) {
@@ -491,13 +491,14 @@ export function StudentRegistrationForm({ onBack, onComplete }: StudentRegistrat
                     <input
                       id="accountNumber"
                       type="text"
-                      maxLength={12}
+                      maxLength={16}
                       value={formData.accountNumber}
                       onChange={(e) => updateField('accountNumber', e.target.value.replace(/\D/g, ''))}
-                      placeholder="Enter 12-digit account number"
+                      placeholder="Enter your bank account number"
                       className={`w-full pl-11 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all ${errors.accountNumber ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'}`}
                     />
                   </div>
+                  <p className="text-xs text-gray-400 mt-1 ml-1">Accepted: 11 to 16 digits</p>
                   {errors.accountNumber && (
                     <div className="flex items-center gap-2 mt-2 text-red-600">
                       <AlertCircle size={16} />

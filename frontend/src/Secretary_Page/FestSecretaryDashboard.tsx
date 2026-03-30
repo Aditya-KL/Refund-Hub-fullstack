@@ -31,7 +31,7 @@ const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const mockUser: SecretaryUser = {
   _id: 'sec_fest_001', fullName: 'Prof. Vikram Nair', employeeId: 'EMP-F01',
   email: 'vikram.nair@nit.edu', phone: '9876500001', department: 'fest',
-  designation: 'Cultural Secretary', institution: 'National Institute of Technology',
+  designation: 'Cultural Secretary', institution: 'Indian Institute of Technology Patna',
   joinDate: '2022-07-01', lastLogin: new Date().toISOString(),
   isVerified: true, isSecretary: true, isSuperAdmin: false,
 };

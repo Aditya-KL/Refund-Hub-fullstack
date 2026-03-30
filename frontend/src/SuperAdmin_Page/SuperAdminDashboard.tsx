@@ -775,7 +775,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 <p className="text-xs text-slate-400 hidden sm:block">{pageTitles[activeView]?.sub}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
+            {/* <div className="flex items-center gap-2.5">
               <div className="text-right hidden sm:block">
                 <p className="text-xs text-slate-500">Portal Status</p>
                 <p className={`text-xs font-bold ${portalActive ? 'text-green-400' : 'text-red-400'}`}>{portalActive ? 'ACTIVE' : 'DISABLED'}</p>
@@ -784,7 +784,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors ${portalActive ? 'bg-green-600' : 'bg-red-600'}`}>
                 <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${portalActive ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
-            </div>
+            </div> */}
           </div>
         </div>
 

@@ -15,7 +15,7 @@ const API_BASE = '/api';
 const mockUser: SecretaryUser = {
   _id: 'sec_acc_001', fullName: 'Ms. Priya Gupta', employeeId: 'EMP-A01',
   email: 'priya.gupta@nit.edu', phone: '9876500004', department: 'account',
-  designation: 'Accounts Secretary', institution: 'National Institute of Technology',
+  designation: 'Accounts Secretary', institution: 'Indian Institute of Technology Patna',
   joinDate: '2019-04-01', lastLogin: new Date().toISOString(),
   isVerified: true, isSecretary: true, isSuperAdmin: false,
   bio: 'Processing final refunds and maintaining financial records for the student welfare portal.',

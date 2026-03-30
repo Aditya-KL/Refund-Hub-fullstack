@@ -128,7 +128,7 @@ export function SuccessConfirmation({ isOpen, onClose, onTrackStatus, claimData 
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-blue-600 font-bold">3.</span>
-                <span>Upload supporting documents from the "My Claims" section</span>
+                <span>Your uploaded documents are now attached to this claim for review</span>
               </li>
             </ul>
           </div>

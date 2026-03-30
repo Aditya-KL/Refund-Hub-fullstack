@@ -651,7 +651,7 @@ function SecretaryDashboardShell({
 const mockMessUser: SecretaryUser = {
   _id: 'sec_mess_001', fullName: 'Dr. Rajesh Kumar', employeeId: 'EMP-M01',
   email: 'rajesh.kumar@nit.edu', phone: '9876500002', department: 'mess',
-  designation: 'Mess Secretary', institution: 'National Institute of Technology',
+  designation: 'Mess Secretary', institution: 'Indian Institute of Technology Patna',
   joinDate: '2021-08-01', lastLogin: new Date().toISOString(),
   isVerified: true, isSecretary: true, isSuperAdmin: false,
 };
@@ -679,7 +679,7 @@ export function MessSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
 const mockHospitalUser: SecretaryUser = {
   _id: 'sec_hosp_001', fullName: 'Prof. Anita Sharma', employeeId: 'EMP-H01',
   email: 'anita.sharma@nit.edu', phone: '9876500003', department: 'hospital',
-  designation: 'Medical Secretary', institution: 'National Institute of Technology',
+  designation: 'Medical Secretary', institution: 'Indian Institute of Technology Patna',
   joinDate: '2020-06-15', lastLogin: new Date().toISOString(),
   isVerified: true, isSecretary: true, isSuperAdmin: false,
 };

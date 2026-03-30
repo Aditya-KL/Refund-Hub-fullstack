@@ -1,6 +1,6 @@
 // frontend/src/services/db_service.ts
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = `${import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000'}/api`;
 
 export const apiService = {
   // ─── ADMIN PROFILE FUNCTIONS ────────────────────────────────────────────
@@ -11,6 +11,20 @@ export const apiService = {
       return await response.json();
     } catch (error) {
       console.error('Fetch admin error:', error);
+      throw error;
+    }
+  },
+
+  getUserProfile: async (userId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/profile`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch user profile');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Fetch user profile error:', error);
       throw error;
     }
   },

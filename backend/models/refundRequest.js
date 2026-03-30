@@ -19,6 +19,9 @@ const refundRequest = new mongoose.Schema({
   // Optional Fest-Specific Fields
   festName: { type: String, trim: true },
   teamName: { type: String, trim: true },
+  messAbsenceFrom: { type: Date, default: null },
+  messAbsenceTo: { type: Date, default: null },
+  messAbsenceDays: { type: Number, default: null },
   
   // ── Details & Financials ────────────────────────────────────
   title:       { type: String, required: true, trim: true }, // Short summary (e.g., "TechFest Speaker Travel")
@@ -32,9 +35,9 @@ const refundRequest = new mongoose.Schema({
     validate: {
       validator: function(v) {
         if (!v) return true; // Skip if empty
-        return /^\d{12}$/.test(v); // Double-checks the 12 digits on the server
+        return /^[A-Za-z0-9._/-]{6,30}$/.test(v); // Payment refs vary by provider
       },
-      message: props => `${props.value} is not a valid 12-digit Transaction ID!`
+      message: props => `${props.value} is not a valid transaction reference.`
     }
   },
 

@@ -6,7 +6,7 @@ interface MedicalRebateFormProps {
   isOpen: boolean;
   onClose: () => void;
   onBack: () => void;
-  onSubmit: (data: MedicalRebateFormData) => void;
+  onSubmit: (data: MedicalRebateFormData) => void | Promise<void>;
 }
 
 export interface MedicalRebateFormData {
@@ -25,6 +25,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit }: Medical
   const [billFiles, setBillFiles] = useState<File[]>([]);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,7 +34,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit }: Medical
 
     const newFiles = Array.from(files).filter((file) => {
       // Validate file type (images and PDFs)
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
       if (!validTypes.includes(file.type)) {
         alert(`${file.name} is not a valid file type. Please upload images or PDFs.`);
         return false;
@@ -98,26 +99,31 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit }: Medical
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateForm()) {
-      onSubmit({
-        hospitalName,
-        treatmentDate,
-        amount: parseFloat(amount),
-        description,
-        billFiles,
-      });
-      // Reset form
-      setHospitalName('');
-      setTreatmentDate(null);
-      setAmount('');
-      setDescription('');
-      setBillFiles([]);
-      setErrors({});
+      try {
+        setIsSubmitting(true);
+        await onSubmit({
+          hospitalName,
+          treatmentDate,
+          amount: parseFloat(amount),
+          description,
+          billFiles,
+        });
+        setHospitalName('');
+        setTreatmentDate(null);
+        setAmount('');
+        setDescription('');
+        setBillFiles([]);
+        setErrors({});
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
   const handleClose = () => {
+    if (isSubmitting) return;
     setHospitalName('');
     setTreatmentDate(null);
     setAmount('');
@@ -151,6 +157,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit }: Medical
             </div>
             <button
               onClick={handleClose}
+              disabled={isSubmitting}
               className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
             >
               <X size={24} className="text-gray-500" />
@@ -300,13 +307,13 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit }: Medical
                     Drag & drop medical bill here, or click to browse
                   </p>
                   <p className="text-sm text-gray-500">
-                    Supported formats: JPG, PNG, GIF, PDF (max 5MB per file)
+                    Supported formats: JPG, PNG, PDF (max 5MB per file)
                   </p>
                 </div>
                 <input
                   type="file"
                   multiple
-                  accept="image/jpeg,image/jpg,image/png,image/gif,application/pdf"
+                  accept="image/jpeg,image/jpg,image/png,application/pdf"
                   onChange={(e) => handleFileSelect(e.target.files)}
                   className="hidden"
                   id="bill-upload"
@@ -378,15 +385,17 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit }: Medical
           <div className="flex items-center justify-between gap-4">
             <button
               onClick={onBack}
+              disabled={isSubmitting}
               className="px-6 py-3 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors"
             >
               ← Back
             </button>
             <button
               onClick={handleSubmit}
-              className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all shadow-sm"
+              disabled={isSubmitting}
+              className="px-8 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-all shadow-sm"
             >
-              Submit Claim
+              {isSubmitting ? 'Uploading...' : 'Submit Claim'}
             </button>
           </div>
         </div>

@@ -20,7 +20,7 @@ const mockProfile: AdminProfile = {
   _id: '69c529dfff7d0dd507258c82', fullName: 'Prof. Aditya Verma', employeeId: 'SA001',
   email: 'aditya.verma@institution.edu', phone: '9876543000',
   department: 'Administration', designation: 'Super Administrator',
-  institution: 'National Institute of Technology', joinDate: '2022-06-01',
+  institution: 'Indian Institute of Technology Patna', joinDate: '2022-06-01',
   lastLogin: '2025-03-27T08:30:00Z', isVerified: true, isSecretary: false, isSuperAdmin: true,
   bio: 'Central administration oversight for the student welfare portal. Responsible for all departmental coordination and financial approvals.',
   address: 'Admin Block, NIT Campus, New Delhi - 110016',
@@ -78,6 +78,27 @@ export function ProfileView({ onLogout }: { onLogout?: () => void }) {
   const [pwdSaving, setPwdSaving] = useState(false);
   const [pwdSuccess, setPwdSuccess] = useState(false);
   const [showToast, setShowToast] = useState(false);  // ✅ ADD HERE
+  const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  const mapAdminProfile = (data: any): AdminProfile => ({
+    _id: data._id || storedUser._id || mockProfile._id,
+    fullName: data.fullName || storedUser.fullName || mockProfile.fullName,
+    employeeId: data.employeeId || data.studentId || storedUser.studentId || mockProfile.employeeId,
+    email: data.email || storedUser.email || mockProfile.email,
+    phone: data.phone || storedUser.phone || mockProfile.phone,
+    department: data.department || storedUser.department || mockProfile.department,
+    designation: data.designation || (data.isSuperAdmin || storedUser.isSuperAdmin ? 'Super Administrator' : mockProfile.designation),
+    institution: data.institution || storedUser.institution || mockProfile.institution,
+    joinDate: data.joinDate || data.createdAt || storedUser.createdAt || mockProfile.joinDate,
+    lastLogin: data.lastLogin || storedUser.lastLogin || mockProfile.lastLogin,
+    isVerified: data.isVerified ?? storedUser.isVerified ?? mockProfile.isVerified,
+    isSecretary: data.isSecretary ?? storedUser.isSecretary ?? mockProfile.isSecretary,
+    isSuperAdmin: data.isSuperAdmin ?? storedUser.isSuperAdmin ?? mockProfile.isSuperAdmin,
+    avatarUrl: data.avatarUrl || data.profilePicUrl || storedUser.profilePicUrl,
+    address: data.address || storedUser.address || mockProfile.address,
+    bio: data.bio || storedUser.bio || mockProfile.bio,
+    createdAt: data.createdAt || storedUser.createdAt || mockProfile.createdAt,
+  });
 
 
   // Replace: useEffect(() => { fetch(`${API_BASE}/admin/profile`).then(r=>r.json()).then(setProfile) }, []);
@@ -87,9 +108,17 @@ export function ProfileView({ onLogout }: { onLogout?: () => void }) {
     const fetchProfile = async () => {
       try {
         const data = await apiService.getAdminProfile();
-        setProfile(data);
+        setProfile(mapAdminProfile(data));
       } catch (error) {
-        console.error("Failed to fetch profile", error);
+        console.error("Failed to fetch admin profile", error);
+        if (storedUser?._id) {
+          try {
+            const fallbackData = await apiService.getUserProfile(storedUser._id);
+            setProfile(mapAdminProfile(fallbackData));
+          } catch (fallbackError) {
+            console.error("Failed to fetch logged-in admin profile", fallbackError);
+          }
+        }
       } finally {
         setIsLoading(false);
       }
@@ -265,7 +294,7 @@ export function ProfileView({ onLogout }: { onLogout?: () => void }) {
             <InfoRow icon={Calendar} label="Member Since" value={new Date(profile.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })} />
             <InfoRow icon={Clock} label="Last Login" value={new Date(profile.lastLogin).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} />
             <InfoRow icon={Briefcase} label="Department" value={profile.department} />
-            {profile.address && <InfoRow icon={MapPin} label="Address" value={profile.address} />}
+            {/* {profile.address && <InfoRow icon={MapPin} label="Address" value={profile.address} />} */}
           </div>
         </div>
 

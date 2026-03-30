@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Calendar, AlertCircle, Info, AlertTriangle } from 'lucide-react';
+import { X, Calendar, AlertCircle, Info, AlertTriangle, Upload, FileText, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface MessRebateFormProps {
@@ -13,6 +13,7 @@ export interface MessRebateFormData {
   fromDate: Date | null;
   toDate: Date | null;
   reason: string;
+  receiptFiles: File[];
 }
 
 export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebateFormProps) {
@@ -23,8 +24,14 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
   const [showToDatePicker, setShowToDatePicker] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showDurationError, setShowDurationError] = useState(false);
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
 
   if (!isOpen) return null;
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minSelectableDate = format(tomorrow, 'yyyy-MM-dd');
 
   const calculateDays = () => {
     if (fromDate && toDate) {
@@ -33,6 +40,37 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
       return diffDays + 1; // Include both start and end date
     }
     return 0;
+  };
+
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return;
+
+    const newFiles = Array.from(files).filter((file) => {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        alert(`${file.name} is not a valid file type. Please upload JPG, PNG, or PDF files.`);
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum file size is 5MB.`);
+        return false;
+      }
+      return true;
+    });
+
+    setReceiptFiles((prev) => [...prev, ...newFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setReceiptFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   const validateForm = () => {
@@ -64,11 +102,12 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
 
   const handleSubmit = () => {
     if (validateForm()) {
-      onSubmit({ fromDate, toDate, reason });
+      onSubmit({ fromDate, toDate, reason, receiptFiles });
       // Reset form
       setFromDate(null);
       setToDate(null);
       setReason('');
+      setReceiptFiles([]);
       setErrors({});
       setShowDurationError(false);
     }
@@ -78,6 +117,7 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
     setFromDate(null);
     setToDate(null);
     setReason('');
+    setReceiptFiles([]);
     setErrors({});
     setShowDurationError(false);
     onClose();
@@ -156,6 +196,9 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
                 <p className="text-sm text-green-800">
                   Mess rebates are only applicable for absences longer than 5 days.
                 </p>
+                <p className="text-xs text-green-700 mt-1">
+                  Start selecting dates from tomorrow onward.
+                </p>
               </div>
             </div>
           )}
@@ -179,8 +222,12 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
                   onChange={(e) => {
                     const date = e.target.value ? new Date(e.target.value) : null;
                     setFromDate(date);
+                    if (date && toDate && toDate < date) {
+                      setToDate(date);
+                    }
                     setErrors((prev) => ({ ...prev, fromDate: '', dateRange: '' }));
                   }}
+                  min={minSelectableDate}
                   className={`
                     w-full px-4 py-3 border rounded-lg
                     focus:outline-none focus:ring-2 focus:ring-green-500
@@ -205,7 +252,7 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
                     setToDate(date);
                     setErrors((prev) => ({ ...prev, toDate: '', dateRange: '' }));
                   }}
-                  min={fromDate ? format(fromDate, 'yyyy-MM-dd') : undefined}
+                  min={fromDate ? format(fromDate, 'yyyy-MM-dd') : minSelectableDate}
                   className={`
                     w-full px-4 py-3 border rounded-lg
                     focus:outline-none focus:ring-2 focus:ring-green-500
@@ -276,6 +323,77 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit }: MessRebate
                 <li>Travel tickets (if applicable)</li>
                 <li>Any supporting documentation</li>
               </ul>
+            </div>
+          )}
+
+          {!showDurationError && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                <FileText size={16} />
+                Supporting Documents (Optional)
+              </label>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  handleFileSelect(e.dataTransfer.files);
+                }}
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  isDragging ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50'
+                }`}
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center ${isDragging ? 'bg-green-100' : 'bg-white shadow-sm'}`}>
+                    <Upload className={isDragging ? 'text-green-600' : 'text-gray-400'} size={28} />
+                  </div>
+                  <div>
+                    <p className="text-gray-900 font-medium">Add hostel leave proof, travel ticket, or supporting PDF</p>
+                    <p className="text-sm text-gray-500">JPG, PNG, PDF only, max 5MB each</p>
+                  </div>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/jpg,image/png,application/pdf"
+                    onChange={(e) => handleFileSelect(e.target.files)}
+                    className="hidden"
+                    id="mess-file-upload"
+                  />
+                  <label
+                    htmlFor="mess-file-upload"
+                    className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium cursor-pointer transition-colors"
+                  >
+                    Select Files
+                  </label>
+                </div>
+              </div>
+
+              {receiptFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Uploaded Files ({receiptFiles.length})</p>
+                  {receiptFiles.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                      <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <FileText className="text-green-600" size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                      </div>
+                      <button onClick={() => removeFile(index)} className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                        <Trash2 size={18} className="text-red-600" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

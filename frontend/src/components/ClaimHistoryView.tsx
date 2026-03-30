@@ -5,6 +5,7 @@ const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 export function ClaimHistoryView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<'all' | 'Mess Rebate' | 'Fest/Activity' | 'Medical Rebate'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'refunded' | 'verified'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   
   // ✅ NEW: State for real database claims
@@ -40,6 +41,19 @@ export function ClaimHistoryView() {
     if (type === 'MEDICAL_REBATE') return 'Medical Rebate';
     return type;
   };
+
+  const formatDateRange = (from?: string, to?: string) => {
+    if (!from || !to) return null;
+    return `${new Date(from).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} - ${new Date(to).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  };
+
+  const getStatusGroup = (status: string) => {
+    if (status === 'REFUNDED') return 'refunded';
+    if (status === 'APPROVED') return 'approved';
+    if (status.includes('VERIFIED')) return 'verified';
+    if (status.includes('PENDING')) return 'pending';
+    return 'all';
+  };
 // Filter and search
 // Filter, search, and Time Limit
   const filteredData = claims.filter((claim) => {
@@ -62,8 +76,9 @@ export function ClaimHistoryView() {
       claim.transactionId?.toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchesFilter = filterCategory === 'all' || categoryName === filterCategory;
+    const matchesStatus = filterStatus === 'all' || getStatusGroup(claim.status) === filterStatus;
     
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesFilter && matchesStatus;
   });
 
   // Sort
@@ -177,6 +192,21 @@ const getStatusBadge = (status: string) => {
             </select>
           </div>
 
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as any)}
+              className="pl-10 pr-8 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white appearance-none cursor-pointer text-sm min-w-[160px]"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="verified">Verified</option>
+              <option value="approved">Approved</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </div>
+
           {/* Sort */}
           <select
             value={sortBy}
@@ -202,7 +232,7 @@ const getStatusBadge = (status: string) => {
                   Category
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Date
+                  Date / Period
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Amount
@@ -215,6 +245,8 @@ const getStatusBadge = (status: string) => {
             <tbody className="divide-y divide-gray-100">
               {sortedData.map((claim) => {
                 const isFest = claim.requestType === 'FEST_REIMBURSEMENT';
+                const isMess = claim.requestType === 'MESS_REBATE';
+                const messRange = formatDateRange(claim.messAbsenceFrom, claim.messAbsenceTo);
                 return (
                 <tr key={claim._id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -232,7 +264,9 @@ const getStatusBadge = (status: string) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-700">
-                      {new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {isMess && messRange
+                        ? messRange
+                        : new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -267,6 +301,8 @@ const getStatusBadge = (status: string) => {
       <div className="lg:hidden space-y-3">
         {sortedData.map((claim) => {
           const isFest = claim.requestType === 'FEST_REIMBURSEMENT';
+          const isMess = claim.requestType === 'MESS_REBATE';
+          const messRange = formatDateRange(claim.messAbsenceFrom, claim.messAbsenceTo);
           return (
           <div key={claim._id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
             {/* Header */}
@@ -288,9 +324,11 @@ const getStatusBadge = (status: string) => {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">Date</span>
+                <span className="text-xs text-gray-600">{isMess ? 'Period' : 'Date'}</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {isMess && messRange
+                    ? messRange
+                    : new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
               <div className="flex items-center justify-between pt-1 border-t border-gray-100">

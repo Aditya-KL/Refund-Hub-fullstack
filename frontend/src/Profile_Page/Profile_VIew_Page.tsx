@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
     User, Mail, Phone, CreditCard, Landmark, ShieldCheck, Edit3, LogOut, 
     Building, MapPin, GraduationCap, Calendar, Star, X, Info, ChevronRight, Check
 } from 'lucide-react';
+import { apiService } from '../services/db_service';
 
 interface ProfileViewProps {
     onEditClick: () => void;
@@ -10,7 +11,22 @@ interface ProfileViewProps {
 }
 
 export function ProfileView({ onEditClick, onLogout }: ProfileViewProps) {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const normalizeUserProfile = (rawUser: any) => {
+        const nestedBank = rawUser?.studentProfile?.bankDetails || {};
+        const flatBank = rawUser?.bankDetails || {};
+
+        return {
+            ...rawUser,
+            bankDetails: {
+                accountHolderName: flatBank.accountHolderName || nestedBank.accountHolderName || '',
+                bankName: flatBank.bankName || nestedBank.bankName || '',
+                accountNumber: flatBank.accountNumber || nestedBank.accountNumber || '',
+                ifscCode: flatBank.ifscCode || nestedBank.ifscCode || '',
+            },
+        };
+    };
+
+    const [user, setUser] = useState<any>(() => normalizeUserProfile(JSON.parse(localStorage.getItem('user') || '{}')));
     const bank = user.bankDetails || {};
     
     // Fixed: Added a check to ensure fullName exists before splitting
@@ -25,6 +41,29 @@ export function ProfileView({ onEditClick, onLogout }: ProfileViewProps) {
         committee: '',
         position: ''
     });
+
+    useEffect(() => {
+        const loadLatestProfile = async () => {
+            try {
+                let latestUser = null;
+
+                if (user?._id) {
+                    latestUser = await apiService.getUserProfile(user._id);
+                } else if (user?.studentId) {
+                    latestUser = await apiService.searchUser(user.studentId);
+                }
+
+                if (!latestUser) return;
+                const normalizedUser = normalizeUserProfile(latestUser);
+                setUser(normalizedUser);
+                localStorage.setItem('user', JSON.stringify(normalizedUser));
+            } catch (error) {
+                console.error('Failed to fetch latest profile:', error);
+            }
+        };
+
+        loadLatestProfile();
+    }, [user?._id, user?.studentId]);
 
     const handleFestVerify = () => {
         if (!festData.festName || !festData.committee || !festData.position) {
