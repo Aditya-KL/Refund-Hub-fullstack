@@ -209,17 +209,17 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-900">Add Team Member</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{fest.festName} · Step {step} of 2</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{fest.festName} · Step {step} of 2</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0">
             <X size={16} className="text-gray-500" />
           </button>
         </div>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto">
           {step === 1 ? (
             <>
               <div>
@@ -246,8 +246,8 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
                           <p className="text-sm font-medium text-gray-900 truncate">{s.fullName}</p>
                           <p className="text-xs text-gray-500 truncate">{s.studentId} · {s.department}</p>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-xs text-gray-400">{yr > 0 ? `${yr}${['st', 'nd', 'rd'][yr - 1] ?? 'th'} yr` : '?'}</span>
+                        <div className="flex items-center gap-1.5 shrink-0 text-right">
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{yr > 0 ? `${yr}${['st', 'nd', 'rd'][yr - 1] ?? 'th'} yr` : '?'}</span>
                           {!canAssign && <span className="text-xs text-red-400 font-medium">Ineligible</span>}
                         </div>
                       </button>
@@ -262,15 +262,15 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
           ) : (
             <>
               <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-xl">
-                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-sm font-bold text-green-700">{initials(selected!.fullName)}</div>
+                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-xs font-bold text-green-700 shrink-0">{initials(selected!.fullName)}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-900 truncate">{selected!.fullName}</p>
                   <p className="text-xs text-gray-500 truncate">{selected!.studentId} · {selected!.email}</p>
-                  <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                  <span className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200 truncate">
                     <GraduationCap size={10} /> {getAcademicYear(selected!.studentId)}yr
                   </span>
                 </div>
-                <button onClick={() => { setStep(1); setSelected(null); }} className="text-xs text-green-600 hover:underline shrink-0">Change</button>
+                <button onClick={() => { setStep(1); setSelected(null); }} className="text-xs text-green-600 hover:underline shrink-0 whitespace-nowrap">Change</button>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Assign Position</label>
@@ -284,10 +284,10 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
                       const cfg = ROLE_CONFIG[p]; const Icon = cfg.icon;
                       return (
                         <button key={p} onClick={() => setPosition(p)}
-                          className={`flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all text-left ${position === p ? `${cfg.border} ${cfg.bg}` : 'border-gray-100 hover:border-gray-200'}`}>
-                          <Icon size={16} className={position === p ? cfg.color : 'text-gray-400'} />
-                          <span className={`text-sm font-medium ${position === p ? cfg.color : 'text-gray-600'}`}>{cfg.label}</span>
-                          {position === p && <Check size={14} className={`ml-auto ${cfg.color}`} />}
+                          className={`flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all text-left min-w-0 ${position === p ? `${cfg.border} ${cfg.bg}` : 'border-gray-100 hover:border-gray-200'}`}>
+                          <Icon size={16} className={`${position === p ? cfg.color : 'text-gray-400'} shrink-0`} />
+                          <span className={`text-sm font-medium truncate ${position === p ? cfg.color : 'text-gray-600'}`}>{cfg.label}</span>
+                          {position === p && <Check size={14} className={`${cfg.color} ml-auto shrink-0`} />}
                         </button>
                       );
                     })}
@@ -297,7 +297,7 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Committee</label>
                 <select value={committee} onChange={e => setCommittee(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white">
+                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white text-gray-900">
                   <option value="">Select committee...</option>
                   {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -311,7 +311,7 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
             </>
           )}
         </div>
-        <div className="flex gap-2 px-5 pb-5">
+        <div className="flex gap-2 px-5 pb-5 border-t border-gray-100 shrink-0">
           {step === 2 && <button onClick={() => setStep(1)} className="flex-1 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">Back</button>}
           {step === 2 && (
             <button onClick={handleAdd} disabled={submitting || eligiblePositions.length === 0}
@@ -480,16 +480,16 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
           {userFests.length > 1 && (
             <div className="relative">
               <button onClick={() => setFestDropdownOpen(v => !v)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors">
-                {selectedFest?.festName || 'Select Fest'}
-                <ChevronDown size={14} className={`transition-transform ${festDropdownOpen ? 'rotate-180' : ''}`} />
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors max-w-xs sm:max-w-none">
+                <span className="truncate">{selectedFest?.festName || 'Select Fest'}</span>
+                <ChevronDown size={14} className={`transition-transform shrink-0 ${festDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               {festDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[180px] overflow-hidden">
+                <div className="absolute right- -0.25 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[130px] overflow-hidden">
                   {userFests.map(f => (
                     <button key={f._id} onClick={() => { setSelectedFest(f); setFestDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${selectedFest?._id === f._id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
-                      {f.festName} <span className="text-xs text-gray-400 ml-1">{f.academicYear}</span>
+                      className={`w-full text-center px-1 py-2.5 text-sm transition-colors ${selectedFest?._id === f._id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      {f.festName} <span className="text-xs text-gray-400 block">{f.academicYear}</span>
                     </button>
                   ))}
                 </div>
@@ -506,7 +506,7 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {([
           { pos: 'FEST_COORDINATOR' as Position, count: fcCount },
           { pos: 'COORDINATOR' as Position, count: coordCount },
@@ -521,9 +521,9 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.bg}`}>
                 <Icon size={18} className={cfg.color} />
               </div>
-              <div className="text-left">
+              <div className="text-left min-w-0 flex-1">
                 <p className={`text-xl font-bold leading-none ${cfg.color}`}>{count}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{cfg.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5 truncate">{cfg.label}</p>
               </div>
             </button>
           );
@@ -571,82 +571,141 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
           <p className="text-xs text-gray-300 mt-1">Try adjusting your filters</p>
         </div>
       ) : (
-        
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-          {/* Table header */}
-          
-         <div className="grid grid-cols-[2.5rem_1.5fr_1fr_1.2fr_1.2fr_2.5rem] gap-x-4 px-4 py-3 bg-gray-50/80 border-b border-gray-100">
-            <div />
-            {([
-              { label: 'Name', field: 'name' as SortField },
-              { label: 'Roll No', field: 'roll' as SortField },
-              { label: 'Role', field: 'position' as SortField },
-              { label: 'Committee', field: 'committee' as SortField },
-            ]).map(col => (
-              <button key={col.field} onClick={() => handleSort(col.field)}
-                className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600 transition-colors text-left">
-                {col.label} <SortIcon field={col.field} />
-              </button>
-            ))}
-            <div />
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <div className="w-full">
+              {/* Table header */}
+              <div className="grid grid-cols-[3rem_2fr_1fr_1.2fr_1.5fr_3rem] gap-x-4 px-4 py-3 bg-gray-50/80 border-b border-gray-100">
+                <div />
+                {([
+                  { label: 'Name', field: 'name' as SortField },
+                  { label: 'Roll No', field: 'roll' as SortField },
+                  { label: 'Role', field: 'position' as SortField },
+                  { label: 'Committee', field: 'committee' as SortField },
+                ]).map(col => (
+                  <button key={col.field} onClick={() => handleSort(col.field)}
+                    className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600 transition-colors text-left">
+                    {col.label} <SortIcon field={col.field} />
+                  </button>
+                ))}
+                <div />
+              </div>
+
+              {/* Rows */}
+              <div className="divide-y divide-gray-50">
+                {filtered.map(member => {
+                  if (!member || !member.user) return null;
+                  const cfg = ROLE_CONFIG[member.position];
+                  const yr = getAcademicYear(member.user.studentId);
+                  return (
+                    <div key={member._id}
+                      className="grid grid-cols-[2.5rem_1.5fr_1fr_1.2fr_1.2fr_2.5rem] gap-x-4 px-4 py-3 items-center hover:bg-gray-50/60 transition-colors group">
+                      {/* Avatar */}
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${cfg.bg} ${cfg.color}`}>
+                        {initials(member.user.fullName)}
+                      </div>
+                      {/* Name */}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{member.user.fullName}</p>
+                        <p className="text-xs text-gray-400 truncate">{member.user.email}</p>
+                      </div>
+                      {/* Roll + year */}
+                      <div className="min-w-0">
+                        <p className="text-sm font-mono text-gray-700 truncate">{member.user.studentId}</p>
+                        {yr > 0 && (
+                          <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                            <GraduationCap size={10} />{yrLabels[yr] ?? `${yr}th`} yr
+                          </span>
+                        )}
+                      </div>
+                      {/* Role */}
+                      <div><RolePill role={member.position} /></div>
+                      {/* Committee */}
+                      <div>
+                        {member.committee
+                          ? <CommitteePill name={member.committee} />
+                          : <span className="text-xs text-gray-300">—</span>}
+                      </div>
+                      {/* Remove */}
+                      <div className="flex justify-center">
+                        {canRemoveMember(member) && (
+                          <button onClick={() => setRemoveTarget(member)}
+                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all sm:opacity-0 group-hover:opacity-100"
+                            title="Remove member">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* Rows */}
-          <div className="divide-y divide-gray-50">
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-gray-100">
             {filtered.map(member => {
-              // Add this guard clause to skip invalid members
               if (!member || !member.user) return null;
-
               const cfg = ROLE_CONFIG[member.position];
               const yr = getAcademicYear(member.user.studentId);
               return (
-                <div key={member._id}
-                  className="grid grid-cols-[2.5rem_1.5fr_1fr_1.2fr_1.2fr_2.5rem] gap-x-4 px-4 py-3 items-center hover:bg-gray-50/60 transition-colors group">
-                  {/* Avatar */}
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${cfg.bg} ${cfg.color}`}>
-                    {initials(member.user.fullName)}
-                  </div>
-                  {/* Name */}
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{member.user.fullName}</p>
-                    <p className="text-xs text-gray-400 truncate">{member.user.email}</p>
-                  </div>
-                  {/* Roll + year */}
-                  <div className="min-w-0">
-                    <p className="text-sm font-mono text-gray-700 truncate">{member.user.studentId}</p>
-                    {yr > 0 && (
-                      <span className="text-xs text-gray-400 flex items-center gap-0.5">
-                        <GraduationCap size={10} />{yrLabels[yr] ?? `${yr}th`} yr
-                      </span>
-                    )}
-                  </div>
-                  {/* Role */}
-                  <div><RolePill role={member.position} /></div>
-                  {/* Committee */}
-                  <div>
-                    {member.committee
-                      ? <CommitteePill name={member.committee} />
-                      : <span className="text-xs text-gray-300">—</span>}
-                  </div>
-                  {/* Remove */}
-                  <div className="flex justify-center">
+                <div key={member._id} className="p-4 space-y-3 hover:bg-gray-50/60 transition-colors">
+                  {/* Header with avatar and name */}
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${cfg.bg} ${cfg.color}`}>
+                      {initials(member.user.fullName)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{member.user.fullName}</p>
+                      <p className="text-xs text-gray-500">{member.user.email}</p>
+                    </div>
                     {canRemoveMember(member) && (
                       <button onClick={() => setRemoveTarget(member)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
                         title="Remove member">
-                        <Trash2 size={13} />
+                        <Trash2 size={14} />
                       </button>
                     )}
                   </div>
+
+                  {/* Info grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {/* Roll No */}
+                    <div>
+                      <p className="text-gray-400 font-medium mb-0.5">Roll No</p>
+                      <p className="font-mono text-gray-700">{member.user.studentId}</p>
+                      {yr > 0 && (
+                        <p className="text-gray-400 flex items-center gap-1 mt-0.5">
+                          <GraduationCap size={10} />{yrLabels[yr] ?? `${yr}th`} yr
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Role */}
+                    <div>
+                      <p className="text-gray-400 font-medium mb-0.5">Role</p>
+                      <div><RolePill role={member.position} /></div>
+                    </div>
+                  </div>
+
+                  {/* Committee */}
+                  {member.committee && (
+                    <div className="text-xs">
+                      <p className="text-gray-400 font-medium mb-0.5">Committee</p>
+                      <CommitteePill name={member.committee} />
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-3 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between">
+          <div className="px-4 py-3 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <p className="text-xs text-gray-400">Showing {filtered.length} of {members.length} members</p>
-            <div className="flex items-center gap-3 text-xs text-gray-400">
+            <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
               <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${ROLE_CONFIG.FEST_COORDINATOR.dot} inline-block`} />{fcCount} FC</span>
               <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${ROLE_CONFIG.COORDINATOR.dot} inline-block`} />{coordCount} Coord</span>
               <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${ROLE_CONFIG.SUB_COORDINATOR.dot} inline-block`} />{subCount} Sub</span>
