@@ -482,14 +482,20 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
               <button onClick={() => setFestDropdownOpen(v => !v)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors max-w-xs sm:max-w-none">
                 <span className="truncate">{selectedFest?.festName || 'Select Fest'}</span>
-                <ChevronDown size={14} className={`transition-transform shrink-0 ${festDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={10} className={`transition-transform shrink-0 ${festDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               {festDropdownOpen && (
-                <div className="absolute right- -0.25 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[130px] overflow-hidden">
-                  {userFests.map(f => (
+                <div className="absolute left -2 top-full mt-2 bg-white border border-gray-150 rounded-xl shadow-lg z-10 min-w-[150px] overflow-hidden">
+                  {userFests.map((f, idx) => (
                     <button key={f._id} onClick={() => { setSelectedFest(f); setFestDropdownOpen(false); }}
-                      className={`w-full text-center px-1 py-2.5 text-sm transition-colors ${selectedFest?._id === f._id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
-                      {f.festName} <span className="text-xs text-gray-400 block">{f.academicYear}</span>
+                      className={`w-full text-center px-4 py-3 text-sm transition-colors ${selectedFest?._id === f._id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      <span className="inline-flex items-center gap-2 justify-center">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${selectedFest?._id === f._id ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {idx + 1}
+                        </span>
+                        <span>{f.festName}</span>
+                      </span>
+                      <span className="text-xs text-gray-400 block mt-0.5">{f.academicYear}</span>
                     </button>
                   ))}
                 </div>

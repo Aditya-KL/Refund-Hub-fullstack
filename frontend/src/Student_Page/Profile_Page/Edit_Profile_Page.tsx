@@ -51,7 +51,7 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
     });
     
    const [academicData, setAcademicData] = useState({
-        department: '', hostel: '', block: '', roomNumber: '', admissionYear: '', messName: ''
+        hostel: '', block: '', roomNumber: '', messName: ''
     });
 
     const [bankData, setBankData] = useState({
@@ -87,11 +87,9 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
         });
 
       setAcademicData({
-            department: currentUser.department || '',
             hostel: currentUser.hostel || '',
             block: currentUser.block || '',
             roomNumber: currentUser.roomNumber || '',
-            admissionYear: currentUser.admissionYear || '',
             messName: currentUser.messName || '',
         });
 
@@ -121,11 +119,9 @@ export function EditProfile({ onBack, onLogout }: EditProfileProps) {
                 });
 
                 setAcademicData({
-                    department: latestUser.department || '',
                     hostel: latestUser.hostel || '',
                     block: latestUser.block || '',
                     roomNumber: latestUser.roomNumber || '',
-                    admissionYear: latestUser.admissionYear || '',
                     messName: latestUser.messName || '',
                 });
 
@@ -385,16 +381,6 @@ return (
                 </div>
 
                 <div className="p-5 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-y-5 sm:gap-y-6 gap-x-8 sm:gap-x-12">
-                    <EditableField 
-                        icon={<GraduationCap size={16} />} label="Department" 
-                        value={academicData.department}
-                        onSave={(val) => handleAcademicUpdate('department', val)} 
-                    />
-                    <EditableField 
-                        icon={<Calendar size={16} />} label="Admission Year"
-                        value={academicData.admissionYear}
-                        onSave={(val) => handleAcademicUpdate('admissionYear', val)} 
-                    />
                     <EditableField 
                         icon={<Building size={16} />} label="Hostel" type="select"
                         value={academicData.hostel}

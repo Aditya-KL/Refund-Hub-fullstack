@@ -722,6 +722,33 @@ app.post('/api/admin/update-status', async (req, res) => {
   }
 });
 
+// ─── DELETE REFUND CLAIM ──────────────────────────────────────
+app.delete('/api/refund-claims/:claimId', async (req, res) => {
+  try {
+    const { claimId } = req.params;
+    
+    if (!claimId || claimId.trim() === '') {
+      return res.status(400).json({ message: 'Claim ID is required.' });
+    }
+    
+    const deleted = await RefundRequest.findByIdAndDelete(claimId);
+    
+    if (!deleted) {
+      return res.status(404).json({ message: 'Claim not found.' });
+    }
+    
+    console.log('✓ Claim deleted:', claimId);
+    res.status(200).json({ 
+      success: true,
+      message: 'Claim deleted successfully.', 
+      claimId 
+    });
+  } catch (err) {
+    console.error('Delete claim error:', err.message);
+    res.status(500).json({ message: 'Server error deleting claim: ' + err.message });
+  }
+});
+
 // ─── ADMIN: SECRETARIES ───────────────────────────────────────
 app.post('/api/admin/secretaries', async (req, res) => {
   try {

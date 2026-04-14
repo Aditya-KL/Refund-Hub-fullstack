@@ -145,8 +145,7 @@ export function ProfileView({ onEditClick, onLogout }: ProfileViewProps) {
                             <GraduationCap className="text-green-600" size={20} /> Academic & Campus Details
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-12">
-                            <InfoItem icon={<GraduationCap size={14}/>} label="Department" value={user.department} />
-                            <InfoItem icon={<Calendar size={14}/>} label="Admission Year" value={user.admissionYear} />
+
                             <InfoItem icon={<Building size={14}/>} label="Hostel" value={user.hostel} />
                             <InfoItem icon={<Building size={14}/>} label="Block" value={user.block} />
                             <InfoItem icon={<Building size={14}/>} label="Mess Name" value={user.messName} />
