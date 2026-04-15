@@ -29,6 +29,17 @@ function getTimeAgo(dateString: string | null | undefined) {
   return date.toLocaleDateString();
 }
 
+// ─── Check if user is currently online (active within last 10 minutes) ─────────
+function isUserOnline(lastLogin: string | null | undefined): boolean {
+  if (!lastLogin) return false;
+  const date = new Date(lastLogin);
+  if (isNaN(date.getTime())) return false;
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInMins = Math.floor(diffInMs / 60000);
+  return diffInMins <= 10; // Online if active within last 10 minutes
+}
+
 interface SuperAdminDashboardProps { onLogout: () => void; }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -394,9 +405,9 @@ function ManageSecretariesModal({ onClose }: { onClose: () => void }) {
                         <p className="text-slate-400 text-xs">{getTimeAgo(s.lastLogin)}</p>
                       </td>
                       <td className="py-4 px-4">
-                        <span className={`text-xs flex items-center gap-1.5 ${s.isVerified ? 'text-green-400' : 'text-slate-500'}`}>
-                          <Circle size={6} className={s.isVerified ? 'fill-green-400' : 'fill-slate-500'} />
-                          {s.isVerified ? 'Verified' : 'Unverified'}
+                        <span className={`text-xs flex items-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                          <Circle size={6} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
+                          {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right">
@@ -434,9 +445,9 @@ function ManageSecretariesModal({ onClose }: { onClose: () => void }) {
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${deptColor[s.department] || deptColor.mess}`}>
                           {deptLabelFull[s.department] || s.department}
                         </span>
-                        <span className={`text-xs flex items-center gap-1 ${s.isVerified ? 'text-green-400' : 'text-slate-500'}`}>
-                          <Circle size={5} className={s.isVerified ? 'fill-green-400' : 'fill-slate-500'} />
-                          {s.isVerified ? 'Active' : 'Inactive'}
+                        <span className={`text-xs flex items-center gap-1 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                          <Circle size={5} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
+                          {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                         </span>
                       </div>
                       <p className="text-slate-500 text-xs mt-1.5">{s.email}</p>
@@ -731,11 +742,32 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
       }
     };
     fetchSecretaries();
+    
+    // Refresh secretaries every 15 seconds to show real-time online status
+    const interval = setInterval(fetchSecretaries, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     fetchOverviewClaims();
   }, []);
+
+  // ─── Heartbeat: Update user's lastLogin every 30 seconds while on this page ────
+  useEffect(() => {
+    if (!storedUser?._id) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`${baseUrl}/api/heartbeat/${storedUser._id}`, { method: 'POST' });
+      } catch (error) {
+        console.error('Heartbeat error:', error);
+      }
+    };
+
+    sendHeartbeat(); // Send immediately on mount
+    const interval = setInterval(sendHeartbeat, 30000); // Then every 30 seconds
+    return () => clearInterval(interval);
+  }, [storedUser._id, baseUrl]);
 
   const handleApproveClaim = async (claimId: string) => {
     if (!storedUser?._id) {
@@ -1070,9 +1102,9 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                               </span>
                             </td>
                             <td className="py-3.5 px-3">
-                              <span className={`text-xs flex items-center gap-1.5 ${s.isVerified ? 'text-green-400' : 'text-slate-500'}`}>
-                                <Circle size={6} className={s.isVerified ? 'fill-green-400' : 'fill-slate-500'} />
-                                {s.isVerified ? 'Active' : 'Inactive'}
+                              <span className={`text-xs flex items-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                                <Circle size={6} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
+                                {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                               </span>
                             </td>
                             <td className="py-3.5 px-3">
@@ -1102,7 +1134,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                           <p className="text-white text-sm font-semibold truncate">{s.fullName}</p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                             <span className={`text-xs font-medium ${deptTextColor[s.department] || 'text-slate-400'}`}>{deptLabelShort[s.department] || s.department}</span>
-                            <span className={`text-xs ${s.isVerified ? 'text-green-400' : 'text-slate-500'}`}>· {s.isVerified ? 'Active' : 'Inactive'}</span>
+                            <span className={`text-xs flex items-center gap-1 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>· <Circle size={3} className={isUserOnline(s.lastLogin) ? 'fill-green-400' : 'fill-slate-500'} /> {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}</span>
                           </div>
                         </div>
                         <p className="text-slate-500 text-xs flex-shrink-0">{getTimeAgo(s.lastLogin)}</p>

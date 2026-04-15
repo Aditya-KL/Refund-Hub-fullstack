@@ -158,6 +158,23 @@ app.get('/',           (_req, res) => res.send('Refund Hub API is running! 🟢'
 app.get('/api/health', (_req, res) => res.status(200).json({ success: true, timestamp: new Date().toISOString() }));
 app.get('/api/test',   (_req, res) => res.status(200).json({ message: 'Backend operational 🚀', timestamp: new Date().toISOString() }));
 
+// ─── Heartbeat - Update user's lastLogin to track online status ─
+app.post('/api/heartbeat/:userId', async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.userId,
+      { lastLogin: new Date() },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json({ success: true, lastLogin: user.lastLogin });
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    res.status(500).json({ error: 'Failed to update heartbeat' });
+  }
+});
+
+
 // ─── Register Routes ──────────────────────────────────────────
 registerRebateRoutes(app);
 registerVerifyRoutes(app);

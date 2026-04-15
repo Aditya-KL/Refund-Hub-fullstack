@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, DollarSign, Clock, CheckCircle } from 'lucide-react';
+import { Plus, DollarSign, Clock, CheckCircle, Home, FileText, User, Users, Shield } from 'lucide-react';
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
 // Layout
@@ -43,6 +43,56 @@ interface UserFest {
 
 interface StudentDashboardProps {
   onLogout: () => void;
+}
+
+// ─── Bottom Nav Component (Mobile) ────────────────────────────────────────
+function BottomNav({ 
+  activeView, 
+  setActiveView, 
+  userRole
+}: { 
+  activeView: string; 
+  setActiveView: (v: string) => void;
+  userRole: FestRole | null;
+}) {
+  const items = [
+    { id: 'dashboard', label: 'Home', icon: Home },
+    { id: 'claims', label: 'My Claims', icon: FileText },
+    { id: 'history', label: 'History', icon: Clock },
+    ...(userRole && (userRole === 'FEST_COORDINATOR' || userRole === 'COORDINATOR') 
+      ? [{ id: 'manage-team', label: 'Team', icon: Users }]
+      : []),
+    ...(userRole && (userRole === 'FEST_COORDINATOR' || userRole === 'COORDINATOR')
+      ? [{ id: 'approve-reimbursement', label: 'Approve', icon: Shield }]
+      : []),
+    { id: 'profile', label: 'Profile', icon: User },
+  ];
+
+  return (
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 z-40 safe-area-bottom">
+      <div className="flex items-stretch h-16">
+        {items.map(item => {
+          const Icon = item.icon;
+          const active = activeView === item.id;
+          return (
+            <button 
+              key={item.id} 
+              onClick={() => setActiveView(item.id)}
+              className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                active 
+                  ? 'text-green-600' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-green-600 rounded-b-full" />}
+              <Icon size={21} strokeWidth={active ? 2.2 : 1.8} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -430,8 +480,8 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
         onMobileToggle={() => setMobileMenuOpen(v => !v)}
       />
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      {/* Main Content - Add padding bottom for mobile nav */}
+      <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
         <MobileHeader
           title={pageTitle}
           onMenuToggle={() => setMobileMenuOpen(v => !v)}
@@ -632,6 +682,13 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
           settings={adminSettings}
         />
       )}
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav 
+        activeView={activeMenuItem} 
+        setActiveView={setActiveMenuItem}
+        userRole={effectiveRole}
+      />
     </div>
   );
 }
