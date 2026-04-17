@@ -158,23 +158,6 @@ app.get('/',           (_req, res) => res.send('Refund Hub API is running! 🟢'
 app.get('/api/health', (_req, res) => res.status(200).json({ success: true, timestamp: new Date().toISOString() }));
 app.get('/api/test',   (_req, res) => res.status(200).json({ message: 'Backend operational 🚀', timestamp: new Date().toISOString() }));
 
-// ─── Heartbeat - Update user's lastLogin to track online status ─
-app.post('/api/heartbeat/:userId', async (req, res) => {
-  try {
-    const user = await User.findByIdAndUpdate(
-      req.params.userId,
-      { lastLogin: new Date() },
-      { new: true }
-    );
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.status(200).json({ success: true, lastLogin: user.lastLogin });
-  } catch (error) {
-    console.error('Heartbeat error:', error);
-    res.status(500).json({ error: 'Failed to update heartbeat' });
-  }
-});
-
-
 // ─── Register Routes ──────────────────────────────────────────
 registerRebateRoutes(app);
 registerVerifyRoutes(app);
@@ -736,33 +719,6 @@ app.post('/api/admin/update-status', async (req, res) => {
     res.status(200).json({ message: `Status updated to ${status}.`, claim: updated });
   } catch (err) {
     res.status(500).json({ message: 'Internal Server Error.' });
-  }
-});
-
-// ─── DELETE REFUND CLAIM ──────────────────────────────────────
-app.delete('/api/refund-claims/:claimId', async (req, res) => {
-  try {
-    const { claimId } = req.params;
-    
-    if (!claimId || claimId.trim() === '') {
-      return res.status(400).json({ message: 'Claim ID is required.' });
-    }
-    
-    const deleted = await RefundRequest.findByIdAndDelete(claimId);
-    
-    if (!deleted) {
-      return res.status(404).json({ message: 'Claim not found.' });
-    }
-    
-    console.log('✓ Claim deleted:', claimId);
-    res.status(200).json({ 
-      success: true,
-      message: 'Claim deleted successfully.', 
-      claimId 
-    });
-  } catch (err) {
-    console.error('Delete claim error:', err.message);
-    res.status(500).json({ message: 'Server error deleting claim: ' + err.message });
   }
 });
 

@@ -144,9 +144,22 @@ async function submitMessRebate(req, res) {
   const upload = buildUploadMiddleware(settings.maxFileUploadMB);
   const uploadMiddleware = upload.array('receiptFiles', 5);
 
+  // Wrap with timeout to prevent hanging on Cloudinary uploads
+  const UPLOAD_TIMEOUT = 30000; // 30 seconds
+  let uploadCompleted = false;
+  const timeoutHandle = setTimeout(() => {
+    if (!uploadCompleted && !res.headersSent) {
+      console.error('[Mess] Upload timeout after 30 seconds');
+      return res.status(408).json({ message: 'File upload timed out. Please check your connection and try again.' });
+    }
+  }, UPLOAD_TIMEOUT);
+
   uploadMiddleware(req, res, async function (err) {
+    uploadCompleted = true;
+    clearTimeout(timeoutHandle);
+    
     if (err) {
-      console.error('Multer/Cloudinary Error (mess):', err);
+      console.error('[Mess] Multer/Cloudinary Error:', err.code, err.message);
       return res.status(400).json({ message: getUploadErrorMessage(err) });
     }
 

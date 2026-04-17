@@ -769,7 +769,7 @@ export function SecretaryClaimsView({ department, secretary }: ClaimsListViewPro
           hospital: 'PENDING_ACADEMIC,VERIFIED_MEDICAL,APPROVED,REJECTED',
           fest: 'VERIFIED_FEST,APPROVED,REJECTED,PUSHED_TO_ACCOUNTS',
         };
-        url = `${API_BASE}/api/verify/claims?type=${typeMap[department]}&status=${statusMap[department]}`;
+        url = `${API_BASE}/api/verify/claims/department?type=${typeMap[department]}&status=${statusMap[department]}`;
       }
       const res = await fetch(url);
       if (res.ok) setClaims(await res.json());
