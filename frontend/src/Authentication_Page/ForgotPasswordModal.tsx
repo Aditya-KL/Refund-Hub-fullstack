@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Mail, Lock, X, KeyRound, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Mail, Lock, X, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -11,9 +11,17 @@ interface ForgotPasswordModalProps {
 export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProps) {
   const [step, setStep] = useState<'EMAIL' | 'OTP' | 'RESET' | 'SUCCESS'>('EMAIL');
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  
+  // OTP State: Array of 6 strings
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Password States
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -23,9 +31,11 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
   const handleClose = () => {
     setStep('EMAIL');
     setEmail('');
-    setOtp('');
+    setOtp(['', '', '', '', '', '']);
     setNewPassword('');
     setConfirmPassword('');
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
     setError('');
     onClose();
   };
@@ -58,9 +68,49 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
     }
   };
 
+  // --- OTP Input Handlers ---
+  const handleOtpChange = (index: number, value: string) => {
+    // Only allow digits
+    if (!/^\d*$/.test(value)) return;
+
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Move to next input if a number was typed
+    if (value && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Move to previous input on Backspace if current box is empty
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').slice(0, 6).replace(/\D/g, ''); // Get only numbers
+    
+    if (pastedData) {
+      const newOtp = [...otp];
+      for (let i = 0; i < pastedData.length; i++) {
+        newOtp[i] = pastedData[i];
+      }
+      setOtp(newOtp);
+      
+      // Auto-focus the next empty box or the last box
+      const focusIndex = Math.min(pastedData.length, 5);
+      otpRefs.current[focusIndex]?.focus();
+    }
+  };
+
   const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
-      setError('OTP must be 6 digits.');
+    const fullOtp = otp.join('');
+    if (fullOtp.length !== 6) {
+      setError('Please fill in all 6 digits.');
       return;
     }
     setError('');
@@ -70,7 +120,7 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
       const res = await fetch(`${BASE_URL}/api/forgot-password/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase(), otp })
+        body: JSON.stringify({ email: email.toLowerCase(), otp: fullOtp })
       });
       const data = await res.json();
       
@@ -98,11 +148,13 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
     setError('');
     setIsLoading(true);
 
+    const fullOtp = otp.join('');
+
     try {
       const res = await fetch(`${BASE_URL}/api/forgot-password/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase(), otp, newPassword })
+        body: JSON.stringify({ email: email.toLowerCase(), otp: fullOtp, newPassword })
       });
       const data = await res.json();
       
@@ -167,21 +219,28 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
           <>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Enter OTP</h3>
             <p className="text-sm text-gray-600 mb-6">We sent a 6-digit code to <span className="font-semibold">{email}</span>.</p>
-            <div className="space-y-4">
-              <div className="relative">
-                <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
-                  placeholder="Enter 6-digit OTP"
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 tracking-widest text-lg font-mono"
-                />
+            <div className="space-y-6">
+              
+              {/* 6 Box OTP Input */}
+              <div className="flex justify-center gap-2" onPaste={handleOtpPaste}>
+                {otp.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => { otpRefs.current[index] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                    className="w-12 h-14 text-center text-xl font-bold text-blue-900 bg-white border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 transition-all"
+                  />
+                ))}
               </div>
+
               <button
                 onClick={handleVerifyOTP}
-                disabled={isLoading || otp.length !== 6}
+                disabled={isLoading || otp.join('').length !== 6}
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white py-3 rounded-xl font-semibold transition-all"
               >
                 {isLoading ? 'Verifying...' : 'Verify OTP'}
@@ -195,26 +254,45 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
             <h3 className="text-xl font-bold text-gray-900 mb-2">Create New Password</h3>
             <p className="text-sm text-gray-600 mb-6">Your new password must be at least 8 characters long.</p>
             <div className="space-y-4">
+              
+              {/* New Password */}
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
-                  type="password"
+                  type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
                   placeholder="New Password"
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
+
+              {/* Confirm Password */}
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
                   placeholder="Confirm New Password"
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full pl-11 pr-12 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
+
               <button
                 onClick={handleResetPassword}
                 disabled={isLoading || !newPassword || !confirmPassword}
