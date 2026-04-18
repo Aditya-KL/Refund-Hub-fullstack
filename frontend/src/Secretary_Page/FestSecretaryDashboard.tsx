@@ -37,7 +37,8 @@ type FestCoordinator = {
   isActive: boolean;
 };
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const BASE = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
+
 
 // ─── Check if user is currently online (active within last 10 minutes) ─────────
 function isUserOnline(lastLogin: string | null | undefined): boolean {
