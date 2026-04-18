@@ -145,6 +145,13 @@ export function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordModalProp
       setError('Passwords do not match.');
       return;
     }
+
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/;
+    if (!passwordRegex.test(newPassword)) {
+      setError('Password must be at least 8 characters and include an uppercase letter, a number, and a special character.');
+      return;
+    }
+
     setError('');
     setIsLoading(true);
 
