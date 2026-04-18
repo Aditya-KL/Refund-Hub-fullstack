@@ -507,7 +507,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-sm w-full sm:w-auto"
                   >
                     <Plus size={20} />
-                    New Mess/Fest Rebate
+                    Apply For Rebate
                   </button>
                 </div>
               </div>
@@ -536,7 +536,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                       You haven't submitted any claims yet.
                     </div>
                   ) : (
-                    dashboardClaims.map((claim) => (
+                    dashboardClaims.slice(0, 3).map((claim) => (
                       <ClaimStatusCard key={claim.id} claim={claim} onClick={() => setActiveMenuItem('claims')} />
                     ))
                   )}

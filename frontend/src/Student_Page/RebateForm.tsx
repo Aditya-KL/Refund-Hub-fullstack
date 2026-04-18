@@ -134,31 +134,32 @@ function DropZone({ onFiles, maxMB, id, error, accentColor = 'green' }: {
   return (
     <div>
       <div
+        onClick={() => document.getElementById(id)?.click()}
         onDragOver={e => { e.preventDefault(); setDrag(true); }}
         onDragLeave={e => { e.preventDefault(); setDrag(false); }}
         onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files) onFiles(e.dataTransfer.files); }}
-        className={`border-2 border-dashed rounded-2xl p-7 text-center transition-all duration-200
+        className={`cursor-pointer border-2 border-dashed rounded-2xl p-7 text-center transition-all duration-200
           ${drag ? `border-${accentColor}-500 bg-${accentColor}-50 scale-[1.01]`
             : error ? 'border-red-400 bg-red-50'
             : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'}`}
       >
-        <div className="flex flex-col items-center gap-2.5">
+        <div className="flex flex-col items-center gap-2.5 pointer-events-none">
           <div className={`w-12 h-12 rounded-full flex items-center justify-center
             ${drag ? `bg-${accentColor}-100` : 'bg-white shadow-sm'}`}>
             <Upload size={22} className={drag ? `text-${accentColor}-600` : 'text-gray-400'} />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-700">Drop files here or browse</p>
+            <p className="text-sm font-medium text-gray-700">Drop files here or click to browse</p>
             <p className="text-xs text-gray-400 mt-0.5">JPG · PNG · PDF — max {maxMB}MB each</p>
           </div>
           <input type="file" multiple accept="image/jpeg,image/jpg,image/png,application/pdf"
             onChange={e => e.target.files && onFiles(e.target.files)}
-            className="hidden" id={id} />
-          <label htmlFor={id}
-            className={`px-5 py-1.5 bg-${accentColor}-600 hover:bg-${accentColor}-700 text-white
-              text-sm rounded-lg font-medium cursor-pointer transition-colors`}>
+            // We keep pointer-events-auto here so the native input still works if directly clicked via label
+            className="hidden pointer-events-auto" id={id} />
+          {/* We can visually keep the button, but the whole box handles the click now */}
+          <span className={`px-5 py-1.5 bg-${accentColor}-600 text-white text-sm rounded-lg font-medium mt-1`}>
             Select Files
-          </label>
+          </span>
         </div>
       </div>
       {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}

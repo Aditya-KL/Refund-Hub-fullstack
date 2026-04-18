@@ -86,6 +86,7 @@ function ToggleRow({ label, description, value, onChange }: {
 }
 
 // ─── Number Input ─────────────────────────────────────────────────────────────
+// ─── Number Input ─────────────────────────────────────────────────────────────
 function NumberInput({ label, value, onChange, min, max, prefix, suffix, description }: {
   label: string; value: number; onChange: (v: number) => void;
   min?: number; max?: number; prefix?: string; suffix?: string; description?: string;
@@ -96,8 +97,21 @@ function NumberInput({ label, value, onChange, min, max, prefix, suffix, descrip
       {description && <p className="text-slate-500 text-xs mb-2 leading-relaxed">{description}</p>}
       <div className="relative flex items-center">
         {prefix && <span className="absolute left-3 text-slate-500 font-semibold text-sm pointer-events-none">{prefix}</span>}
-        <input type="number" value={value} min={min} max={max} onChange={e => onChange(Number(e.target.value))}
-          className={`w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-colors ${prefix ? 'pl-8 pr-4' : suffix ? 'pl-4 pr-12' : 'px-4'}`} />
+        <input 
+          type="number" 
+          value={value.toString()} 
+          min={min} 
+          max={max} 
+          onChange={e => {
+            const val = e.target.value;
+            if (val === '') {
+              onChange(0);
+              return;
+            }
+            onChange(parseInt(val, 10));
+          }}
+          className={`w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-colors ${prefix ? 'pl-8 pr-4' : suffix ? 'pl-4 pr-12' : 'px-4'}`} 
+        />
         {suffix && <span className="absolute right-3 text-slate-500 text-xs font-medium pointer-events-none">{suffix}</span>}
       </div>
     </div>
