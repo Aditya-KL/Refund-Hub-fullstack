@@ -13,6 +13,8 @@ interface ServerSettings {
   messPortalActive: boolean; 
   festPortalActive: boolean; 
   hospitalPortalActive: boolean; 
+  messAdvanceNoticeDays: number;
+  medicalPastClaimDays: number;
   // ------------------------------------------------
   registrationOpen: boolean; maintenanceMode: boolean; maintenanceMessage: string;
   messRebateRateDaily: number; maxFestReimbursement: number; maxMedicalReimbursement: number;
@@ -30,6 +32,8 @@ const defaultSettings: ServerSettings = {
   messPortalActive: true, 
   festPortalActive: true, 
   hospitalPortalActive: true,
+  messAdvanceNoticeDays: 3,
+  medicalPastClaimDays: 30,
   // --------------------------------------
   registrationOpen: true, maintenanceMode: false,
   maintenanceMessage: 'System is under maintenance. Please check back shortly.',
@@ -226,6 +230,8 @@ export function PortalSettingsView() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
               <NumberInput label="Max Claims / Month" value={settings.maxClaimsPerMonth} onChange={v => update('maxClaimsPerMonth', v)} suffix="claims" min={1} description="Per-student monthly limit" />
               <NumberInput label="Max File Upload" value={settings.maxFileUploadMB} onChange={v => update('maxFileUploadMB', v)} suffix="MB" min={1} max={100} description="Per-attachment size limit" />
+              <NumberInput label="Mess Advance Notice" value={settings.messAdvanceNoticeDays} onChange={v => update('messAdvanceNoticeDays', v)} suffix="days" min={0} description="Days required before absence starts" />
+              <NumberInput label="Medical Claim Window" value={settings.medicalPastClaimDays} onChange={v => update('medicalPastClaimDays', v)} suffix="days" min={1} description="Max past days allowed for treatment" />
             </div>
           </SectionCard>
 

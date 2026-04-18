@@ -25,7 +25,11 @@ export interface AdminSettings {
   maxMessRebateDays: number;          // max days allowed
   maxFileUploadMB: number;            // per-file limit
   autoApproveBelow: number;           // auto-approve threshold
-  portalActive: boolean;
+  messAdvanceNoticeDays: number;
+  medicalPastClaimDays: number;
+  messPortalActive: boolean;
+  festPortalActive: boolean;
+  hospitalPortalActive: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
   claimExpiryDays: number;
@@ -44,10 +48,14 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   messRebateRateDaily: 150,
   maxFestReimbursement: 5000,
   maxMedicalReimbursement: 10000,
+  messAdvanceNoticeDays: 3,
+  medicalPastClaimDays: 30,
   maxMessRebateDays: 30,
   maxFileUploadMB: 10,
-  autoApproveBelow: 500,
-  portalActive: true,
+  autoApproveBelow: 100,
+  messPortalActive: true,
+  festPortalActive: true,
+  hospitalPortalActive: true,
   maintenanceMode: false,
   maintenanceMessage: 'System is under maintenance. Please check back shortly.',
   claimExpiryDays: 90,
@@ -197,25 +205,6 @@ export function SelectCategoryModal({
     );
   }
 
-  if (!settings.portalActive) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck size={32} className="text-red-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Portal Inactive</h2>
-          <p className="text-gray-600 text-sm">The claims portal is currently closed. Please check back later.</p>
-          <button onClick={onClose}
-            className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-medium text-sm">
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   const categories = [
     {
       id: 'mess-rebate',
@@ -338,7 +327,24 @@ export function SelectCategoryModal({
             className="px-5 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
             Cancel
           </button>
-          <button onClick={() => { if (selected) { onNext(selected); setSelected(null); } }}
+          <button 
+            onClick={() => { 
+              if (selected) { 
+                if (selected === 'mess-rebate' && !settings.messPortalActive) {
+                  return alert('The Mess Claims portal is currently disabled.');
+                }
+                if (selected === 'fest-activity' && !settings.festPortalActive) {
+                  return alert('The Fest Reimbursements portal is currently disabled.');
+                }
+                if (selected === 'medical-rebate' && !settings.hospitalPortalActive) {
+                  return alert('The Medical Claims portal is currently disabled.');
+                }
+                // -------------------------
+
+                onNext(selected); 
+                setSelected(null); 
+              } 
+            }}
             disabled={!selected}
             className="px-7 py-2.5 text-sm rounded-xl font-semibold transition-all
               disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed
@@ -370,7 +376,9 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
   if (!isOpen) return null;
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = format(tomorrow, 'yyyy-MM-dd');
+  const minDateObj = new Date(); 
+  minDateObj.setDate(minDateObj.getDate() + (settings.messAdvanceNoticeDays || 0));
+  const minDate = format(minDateObj, 'yyyy-MM-dd');
 
   const days = fromDate && toDate
     ? Math.ceil(Math.abs(toDate.getTime() - fromDate.getTime()) / 86400000) + 1 : 0;
@@ -835,6 +843,12 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
 
   const maxAmt = settings.maxMedicalReimbursement;
 
+  const maxDateObj = new Date();
+  const maxDate = format(maxDateObj, 'yyyy-MM-dd');
+  const minDateObj = new Date();
+  minDateObj.setDate(maxDateObj.getDate() - (settings.medicalPastClaimDays || 30));
+  const minDate = format(minDateObj, 'yyyy-MM-dd');
+
   const handleFiles = (fl: FileList) => {
     const maxBytes = settings.maxFileUploadMB * 1024 * 1024;
     const valid = Array.from(fl).filter(f => {
@@ -906,7 +920,8 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Treatment Date *</label>
               <input type="date" value={date ? format(date, 'yyyy-MM-dd') : ''}
-                max={format(new Date(), 'yyyy-MM-dd')}
+                min={minDate} 
+                max={maxDate}
                 onChange={e => { setDate(e.target.value ? new Date(e.target.value) : null); setErrors(p => ({ ...p, date: '' })); }}
                 className={`w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 ${errors.date ? 'border-red-400' : 'border-gray-200'}`} />
               {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
