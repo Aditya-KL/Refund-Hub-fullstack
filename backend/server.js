@@ -808,3 +808,15 @@ app.get('/api/claims/my-fests/:studentId', async (req, res) => {
 // ─── START ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, '0.0.0.0', () => console.log(`📡 Server running on port ${PORT}`));
+
+// to keep backend alive on platforms like Render.com
+const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${PORT}`;
+
+setInterval(() => {
+  fetch(`${BACKEND_URL}/api/health`)
+    .then(res => {
+      if (res.ok) console.log('🟢 Keep-alive ping successful');
+      else console.log('🟡 Keep-alive ping responded with status:', res.status);
+    })
+    .catch(err => console.error('🔴 Keep-alive ping failed:', err.message));
+}, 14 * 60 * 1000);
