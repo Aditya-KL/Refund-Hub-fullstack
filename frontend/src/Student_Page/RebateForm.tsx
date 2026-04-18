@@ -183,13 +183,14 @@ export function SelectCategoryModal({
   settings = DEFAULT_SETTINGS
 }: SelectCategoryModalProps) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [portalError, setPortalError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   // Portal / maintenance guard
   if (settings.maintenanceMode) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -261,7 +262,7 @@ export function SelectCategoryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSelected(null); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         {/* Header */}
@@ -284,7 +285,11 @@ export function SelectCategoryModal({
             const c = colorMap[cat.color];
             const isSelected = selected === cat.id;
             return (
-              <button key={cat.id} onClick={() => setSelected(cat.id)}
+              <button key={cat.id} 
+                onClick={() => { 
+                  setSelected(cat.id); 
+                  setPortalError(null);
+                }}
                 className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-150
                   ${isSelected ? `ring-2 ${c.ring} border-transparent` : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}`}>
                 <div className="flex items-center gap-4">
@@ -322,28 +327,39 @@ export function SelectCategoryModal({
           )}
         </div>
 
+        {portalError && (
+          <div className="px-5 pb-2">
+            <div className="flex items-center gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-bottom-2">
+              <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
+              <p className="text-sm font-semibold text-red-800">{portalError}</p>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-5 pb-5 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <button onClick={() => { setSelected(null); onClose(); }}
+          <button onClick={() => { setSelected(null); setPortalError(null); onClose(); }}
             className="px-5 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
             Cancel
           </button>
+          
           <button 
             onClick={() => { 
               if (selected) { 
+                // --- NEW PORTAL CHECKS WITH UI ERROR ---
                 if (selected === 'mess-rebate' && !settings.messPortalActive) {
-                  return alert('The Mess Claims portal is currently disabled.');
+                  return setPortalError('The Mess Claims portal is currently disabled.');
                 }
                 if (selected === 'fest-activity' && !settings.festPortalActive) {
-                  return alert('The Fest Reimbursements portal is currently disabled.');
+                  return setPortalError('The Fest Reimbursements portal is currently disabled.');
                 }
                 if (selected === 'medical-rebate' && !settings.hospitalPortalActive) {
-                  return alert('The Medical Claims portal is currently disabled.');
+                  return setPortalError('The Medical Claims portal is currently disabled.');
                 }
-                // -------------------------
-
+                
                 onNext(selected); 
                 setSelected(null); 
+                setPortalError(null);
               } 
             }}
             disabled={!selected}
@@ -412,7 +428,7 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { reset(); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -658,7 +674,7 @@ export function FestReimbursementForm({ isOpen, onClose, onBack, onSubmit, setti
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { reset(); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -874,7 +890,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { if (!submitting) { reset(); onClose(); } }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -1015,7 +1031,7 @@ export function FestClaimSuccess({ isOpen, onClose, onTrackStatus, onViewRecords
   const autoApproved = claimData.amount <= settings.autoApproveBelow;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-[95%] max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Top */}
@@ -1144,7 +1160,7 @@ export function SuccessConfirmation({ isOpen, onClose, onTrackStatus, claimData,
   const autoApproved = claimData.amount != null && claimData.amount <= settings.autoApproveBelow;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-[95%] max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="text-center pt-10 pb-6 px-6">

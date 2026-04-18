@@ -165,7 +165,8 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
           name="claim-filter"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value as 'ALL' | 'FEST_REIMBURSEMENT' | 'MESS_REBATE' | 'MEDICAL_REBATE')}
-          className="pl-4 pr-10 py-2.5 rounded-lg font-semibold text-sm border border-gray-300 bg-white text-gray-900 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all cursor-pointer"
+          // 🔥 ADDED: min-w-[220px], pl-4, and pr-10
+          className="min-w-[220px] pl-4 pr-10 py-2.5 rounded-lg font-semibold text-sm border border-gray-300 bg-white text-gray-900 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all cursor-pointer"
         >
           <option value="ALL">All Claims ({claims.length})</option>
           <option value="FEST_REIMBURSEMENT">Fest/Activity ({festCount})</option>

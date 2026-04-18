@@ -459,7 +459,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
     activeMenuItem === 'refunds'               ? 'Refunds & Settlements' :
     activeMenuItem === 'history'               ? 'Claim History' :
     activeMenuItem === 'manage-team'           ? 'Manage Team' :
-    activeMenuItem === 'approve-reimbursement' ? 'Approve Reimbursements' :
+    activeMenuItem === 'approve-reimbursement' ? 'Verify Reimbursements' :
     activeMenuItem === 'settings'              ? 'Settings' :
     'Refund Hub';
 
@@ -546,8 +546,8 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
               <div className="mt-8 bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
                 <p className="text-sm text-gray-600">
                   Need help? Contact support at{' '}
-                  <a href="mailto:support@refundhub.edu" className="text-green-600 hover:text-green-700 font-medium">
-                    support@refundhub.edu
+                  <a href="mailto:refundhub.verify@gmail.com" className="text-green-600 hover:text-green-700 font-medium">
+                    refundhub.verify@gmail.com
                   </a>{' '}
                   or visit the admin office
                 </p>

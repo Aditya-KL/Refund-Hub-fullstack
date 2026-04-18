@@ -80,7 +80,7 @@ function getAcademicYear(rollNo: string): number {
 
 function getEligiblePositions(rollNo: string): Position[] {
   const yr = getAcademicYear(rollNo);
-  if (yr === 3) return ['COORDINATOR', 'SUB_COORDINATOR'];
+  if (yr === 3) return ['COORDINATOR'];
   if (yr === 2) return ['SUB_COORDINATOR'];
   return [];
 }
