@@ -1169,19 +1169,26 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                   <p className="text-xs text-slate-400 mb-3">Total amount disbursed by department</p>
                   
                   <ResponsiveContainer width="100%" height={190}>
-                    <PieChart>
-                      {/* Using refundedDeptData instead of pendingDeptData */}
+                    <PieChart style={{ outline: 'none' }}>
                       <Pie 
                         data={refundedDeptData} 
                         cx="50%" cy="50%" 
-                        outerRadius={70} 
+                        // 1. Reduced outerRadius from 70 to 55 to give labels more room to breathe
+                        outerRadius={55} 
                         dataKey="value" 
                         labelLine={false}
+                        // 2. Added outline: 'none' to stop the weird box from appearing on click
+                        style={{ outline: 'none' }}
                         label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
                       >
-                        {refundedDeptData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                        {refundedDeptData.map((entry, i) => (
+                          <Cell 
+                            key={i} 
+                            fill={entry.color} 
+                            style={{ outline: 'none' }} // 3. Also removes focus ring from individual slices
+                          />
+                        ))}
                       </Pie>
-                      {/* Tooltip removed as requested */}
                     </PieChart>
                   </ResponsiveContainer>
 
