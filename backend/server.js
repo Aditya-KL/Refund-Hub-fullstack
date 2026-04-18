@@ -821,15 +821,15 @@ app.post('/api/forgot-password/send-otp', async (req, res) => {
       return res.status(404).json({ message: 'User with this email not found.' });
     }
 
-    // Generate a random 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expireTime = Date.now() + 2 * 60 * 1000;
     
-    // Set expiration to 2 minutes from now
-    user.resetPasswordOtp = otp;
-    user.resetPasswordExpires = Date.now() + 2 * 60 * 1000; 
-    await user.save();
+    // 🔥 FIX: Use updateOne to bypass full document validation
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { resetPasswordOtp: otp, resetPasswordExpires: expireTime } }
+    );
 
-    // Send the email using your existing Nodemailer transporter
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to: user.email,
@@ -883,7 +883,6 @@ app.post('/api/forgot-password/reset', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
 
-    // Do one final check to ensure the OTP is still valid just in case they waited too long on the last screen
     const user = await User.findOne({ 
       email: email.toLowerCase(),
       resetPasswordOtp: otp,
@@ -894,19 +893,24 @@ app.post('/api/forgot-password/reset', async (req, res) => {
       return res.status(400).json({ message: 'OTP expired. Please request a new one.' });
     }
 
-    // Hash the new password and save it
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.passwordChangedAt = new Date();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     
-    // Clear the OTP fields so they can't be reused
-    user.resetPasswordOtp = null;
-    user.resetPasswordExpires = null;
-    
-    // Reset login attempts in case they were locked out
-    user.failedLoginAttempts = 0;
-    user.lockedUntil = undefined;
-
-    await user.save();
+    // 🔥 FIX: Use updateOne here as well
+    await User.updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          password: hashedPassword,
+          passwordChangedAt: new Date(),
+          failedLoginAttempts: 0
+        },
+        $unset: {
+          resetPasswordOtp: "",
+          resetPasswordExpires: "",
+          lockedUntil: ""
+        }
+      }
+    );
 
     res.status(200).json({ message: 'Password reset successful.' });
   } catch (error) {
