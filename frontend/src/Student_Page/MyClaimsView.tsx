@@ -15,6 +15,8 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [filterType, setFilterType] = useState<'ALL' | 'FEST_REIMBURSEMENT' | 'MESS_REBATE' | 'MEDICAL_REBATE'>('ALL');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchClaims = async () => {
@@ -79,7 +81,17 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
       
       console.log('Response status:', response.status);
       
-      const data = await response.json();
+      // Try to parse response as JSON
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.warn('Response is not JSON:', text.substring(0, 100));
+        data = { message: 'Server error: Invalid response format' };
+      }
+      
       console.log('Response data:', data);
       
       if (response.ok) {
@@ -453,7 +465,7 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black bg-opacity-20 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black bg-opacity-10 backdrop-blur-lg p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">

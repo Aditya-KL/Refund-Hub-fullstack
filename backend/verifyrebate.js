@@ -935,6 +935,58 @@ async function getClaimDetail(req, res) {
   }
 }
 
+// ─── DELETE claim (only pending claims) ───────────────────────
+async function deleteClaim(req, res) {
+  try {
+    const { claimId } = req.params;
+    const { userId } = req.body || {};
+
+    // Validate claimId format
+    if (!isValidObjectId(claimId)) {
+      return res.status(400).json({ message: 'Invalid claim ID format.' });
+    }
+
+    // Find the claim
+    const claim = await RefundRequest.findById(claimId);
+    if (!claim) {
+      return res.status(404).json({ message: 'Claim not found.' });
+    }
+
+    // Only allow deletion of pending claims
+    const pendingStatuses = [
+      'PENDING_TEAM_COORD',
+      'PENDING_FEST_COORD',
+      'PENDING_COORD',
+      'PENDING_FC',
+      'PENDING_MESS_MANAGER',
+      'PENDING_VP',
+      'PENDING_ACADEMIC'
+    ];
+
+    if (!pendingStatuses.includes(claim.status)) {
+      return res.status(403).json({ 
+        message: `Cannot delete claim with status '${claim.status}'. Only pending claims can be deleted.` 
+      });
+    }
+
+    // Verify ownership (optional: if userId is provided, ensure it matches)
+    if (userId && claim.student.toString() !== userId) {
+      return res.status(403).json({ message: 'You do not have permission to delete this claim.' });
+    }
+
+    // Delete the claim
+    await RefundRequest.findByIdAndDelete(claimId);
+
+    res.status(200).json({ 
+      message: 'Claim deleted successfully.',
+      claimId: claimId 
+    });
+  } catch (err) {
+    console.error('deleteClaim error:', err);
+    res.status(500).json({ message: 'Server error deleting claim.' });
+  }
+}
+
 // ─── Register all verification routes ─────────────────────────
 function registerVerifyRoutes(app) {
   app.get('/api/verify/fest/claims',                          getFestClaimsForActor);
@@ -948,6 +1000,7 @@ function registerVerifyRoutes(app) {
   app.post('/api/verify/accounts/export-batch',               exportAccountsBatch);
   app.post('/api/verify/accounts/batches/:batchId/refund',    refundAccountsBatch);
   app.post('/api/verify/claims/:claimId/refund',              refundClaim);
+  app.delete('/api/refund-claims/:claimId',                   deleteClaim);
   app.get('/api/verify/claims',                               getClaimsByDepartment);
   app.get('/api/verify/claims/:claimId',                      getClaimDetail);
   app.get('/api/verify/accounts/claims',                      getAccountsClaims);
@@ -966,6 +1019,7 @@ module.exports = {
   exportAccountsBatch,
   refundAccountsBatch,
   refundClaim,
+  deleteClaim,
   getClaimsByDepartment,
   getAccountsClaims,
   getClaimDetail,
