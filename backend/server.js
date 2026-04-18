@@ -808,7 +808,6 @@ app.get('/api/claims/my-fests/:studentId', async (req, res) => {
 // ─── START ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, '0.0.0.0', () => console.log(`📡 Server running on port ${PORT}`));
-app.listen(PORT, '0.0.0.0', () => console.log(`📡 Server running on port ${PORT}`));
 
 // ─── FORGOT PASSWORD FLOW ─────────────────────────────────────
 
@@ -883,7 +882,13 @@ app.post('/api/forgot-password/verify-otp', async (req, res) => {
 app.post('/api/forgot-password/reset', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-
+    
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 8 characters and include an uppercase letter, a number, and a special character.' 
+      });
+    }
     const user = await User.findOne({ 
       email: email.toLowerCase(),
       resetPasswordOtp: otp,

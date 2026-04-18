@@ -94,18 +94,23 @@ const getUploadErrorMessage = (err) => {
   return `File upload failed: ${err.message}`;
 };
 
-/**
- * Guard: check portalActive and maintenanceMode from ServerSettings.
- * Returns { blocked: true, message } if blocked, else { blocked: false, settings }.
- */
-async function checkPortalGuard() {
+async function checkPortalGuard(portalType) {
   const settings = await ServerSettings.getSettings();
+  
   if (settings.maintenanceMode) {
     return { blocked: true, message: settings.maintenanceMessage || 'System is under maintenance.' };
   }
-  if (!settings.portalActive) {
-    return { blocked: true, message: 'The claims portal is currently inactive.' };
+
+  if (portalType === 'MESS' && !settings.messPortalActive) {
+    return { blocked: true, message: 'The Mess Claims portal is currently disabled.' };
   }
+  if (portalType === 'FEST' && !settings.festPortalActive) {
+    return { blocked: true, message: 'The Fest Reimbursements portal is currently disabled.' };
+  }
+  if (portalType === 'HOSPITAL' && !settings.hospitalPortalActive) {
+    return { blocked: true, message: 'The Medical Claims portal is currently disabled.' };
+  }
+
   return { blocked: false, settings };
 }
 
@@ -135,7 +140,7 @@ async function checkMonthlyClaimLimit(userId, maxPerMonth) {
  */
 async function submitMessRebate(req, res) {
   // Portal guard
-  const guard = await checkPortalGuard();
+ const guard = await checkPortalGuard('MESS');
   if (guard.blocked) return res.status(503).json({ message: guard.message });
 
   const settings = guard.settings;
@@ -254,7 +259,7 @@ async function submitMessRebate(req, res) {
  * Only accessible to fest members (validated server-side).
  */
 async function submitFestClaim(req, res) {
-  const guard = await checkPortalGuard();
+  const guard = await checkPortalGuard('FEST');
   if (guard.blocked) return res.status(503).json({ message: guard.message });
 
   const settings = guard.settings;
@@ -380,7 +385,7 @@ async function submitMedicalRebate(req, res) {
     console.error('Medical claim upload aborted by client.');
   });
 
-  const guard = await checkPortalGuard();
+  const guard = await checkPortalGuard('HOSPITAL');
   if (guard.blocked) return res.status(503).json({ message: guard.message });
 
   const settings = guard.settings;

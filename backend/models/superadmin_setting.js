@@ -45,7 +45,9 @@ AuditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 365 * 24 * 60 * 60 
 // ═══════════════════════════════════════════════════════════════
 const ServerSettingsSchema = new mongoose.Schema({
   _singleton: { type: String, default: 'GLOBAL', unique: true, immutable: true },
-  portalActive:       { type: Boolean, default: true },
+  messPortalActive:     { type: Boolean, default: true },
+  festPortalActive:     { type: Boolean, default: true },
+  hospitalPortalActive: { type: Boolean, default: true },
   registrationOpen:   { type: Boolean, default: true },
   maintenanceMode:    { type: Boolean, default: false },
   maintenanceMessage: { type: String, default: 'System is under maintenance. Please check back shortly.' },

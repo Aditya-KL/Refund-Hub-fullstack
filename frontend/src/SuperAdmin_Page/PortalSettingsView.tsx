@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // ADD useEffect HERE
+import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/db_service';
 import {
   Settings, Shield, Globe, Landmark, Save, RefreshCcw,
@@ -9,7 +9,12 @@ import {
 const API_BASE = '/api';
 
 interface ServerSettings {
-  portalActive: boolean; registrationOpen: boolean; maintenanceMode: boolean; maintenanceMessage: string;
+  // --- REPLACED portalActive WITH 3 NEW PORTALS ---
+  messPortalActive: boolean; 
+  festPortalActive: boolean; 
+  hospitalPortalActive: boolean; 
+  // ------------------------------------------------
+  registrationOpen: boolean; maintenanceMode: boolean; maintenanceMessage: string;
   messRebateRateDaily: number; maxFestReimbursement: number; maxMedicalReimbursement: number;
   maxAccountClaim: number; maxMessRebateDays: number; autoApproveBelow: number;
   maxClaimsPerMonth: number; claimExpiryDays: number; maxFileUploadMB: number; sessionTimeoutMinutes: number;
@@ -21,7 +26,12 @@ interface ServerSettings {
 }
 
 const defaultSettings: ServerSettings = {
-  portalActive: true, registrationOpen: true, maintenanceMode: false,
+  // --- DEFAULT VALUES FOR NEW PORTALS ---
+  messPortalActive: true, 
+  festPortalActive: true, 
+  hospitalPortalActive: true,
+  // --------------------------------------
+  registrationOpen: true, maintenanceMode: false,
   maintenanceMessage: 'System is under maintenance. Please check back shortly.',
   messRebateRateDaily: 150, maxFestReimbursement: 5000, maxMedicalReimbursement: 10000,
   maxAccountClaim: 25000, maxMessRebateDays: 30, autoApproveBelow: 500,
@@ -113,12 +123,10 @@ export function PortalSettingsView() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
 
-  // Replace: useEffect(() => { fetch(`${API_BASE}/server_settings`).then(r=>r.json()).then(setSettings) }, []);
-useEffect(() => {
+  useEffect(() => {
     const loadSettings = async () => {
       try {
         const dbSettings = await apiService.getSettings();
-        // Merge the DB settings over the defaults so we never have null values
         setSettings(prev => ({ ...prev, ...dbSettings }));
       } catch (error) {
         console.error("Error loading settings from DB:", error);
@@ -127,19 +135,16 @@ useEffect(() => {
     loadSettings();
   }, []);
 
-
   const update = <K extends keyof ServerSettings>(key: K, value: ServerSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
 
- const handleSave = async () => {
+  const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 🔴 NEW CODE: Send the actual settings object to the database!
       const updatedData = await apiService.updateSettings(settings);
       
-      // Update our local state with whatever the database sent back
       if (updatedData && updatedData.settings) {
          setSettings(prev => ({ ...prev, ...updatedData.settings }));
       }
@@ -155,16 +160,11 @@ useEffect(() => {
       setIsSaving(false);
     }
   };
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
-        {/* <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-            <Settings className="text-blue-400" size={21} /> Portal Configuration
-          </h2>
-          <p className="text-slate-400 text-xs sm:text-sm mt-1">Settings are persisted to DB and applied globally</p>
-        </div> */}
         <div className="flex items-center gap-3">
           {lastSaved && <p className="text-slate-500 text-xs hidden sm:block">Saved {lastSaved.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>}
           <button onClick={handleSave} disabled={isSaving}
@@ -199,9 +199,16 @@ useEffect(() => {
         <div className="xl:col-span-2 space-y-4">
 
           <SectionCard icon={Globe} iconColor="text-blue-400" title="System Availability">
-            <ToggleRow label="Global Portal Status" description="Enable/Disable access for all users and secretaries." value={settings.portalActive} onChange={v => update('portalActive', v)} />
+            
+            {/* --- NEW GRANULAR PORTAL TOGGLES --- */}
+            <ToggleRow label="Mess Portal Status" description="Enable/Disable new claims and access for Mess rebates." value={settings.messPortalActive} onChange={v => update('messPortalActive', v)} />
+            <ToggleRow label="Fest Portal Status" description="Enable/Disable new claims and access for Fest reimbursements." value={settings.festPortalActive} onChange={v => update('festPortalActive', v)} />
+            <ToggleRow label="Hospital Portal Status" description="Enable/Disable new claims and access for Medical reimbursements." value={settings.hospitalPortalActive} onChange={v => update('hospitalPortalActive', v)} />
+            {/* ----------------------------------- */}
+
             <ToggleRow label="Public Registration" description="Allow new secretary accounts via institutional email." value={settings.registrationOpen} onChange={v => update('registrationOpen', v)} />
             <ToggleRow label="Maintenance Mode" description="Block all claim submissions and show a maintenance banner." value={settings.maintenanceMode} onChange={v => update('maintenanceMode', v)} />
+            
             {settings.maintenanceMode && (
               <div className="mt-4">
                 <TextInput label="Maintenance Message" value={settings.maintenanceMessage} onChange={v => update('maintenanceMessage', v)} placeholder="System under maintenance..." description="Shown to users when maintenance mode is active" />
@@ -216,42 +223,12 @@ useEffect(() => {
               <NumberInput label="Max Fest Reimbursement" value={settings.maxFestReimbursement} onChange={v => update('maxFestReimbursement', v)} prefix="₹" min={0} description="Upper cap per fest claim" />
               <NumberInput label="Max Medical Claim" value={settings.maxMedicalReimbursement} onChange={v => update('maxMedicalReimbursement', v)} prefix="₹" min={0} description="Upper cap per medical claim" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
               <NumberInput label="Max Claims / Month" value={settings.maxClaimsPerMonth} onChange={v => update('maxClaimsPerMonth', v)} suffix="claims" min={1} description="Per-student monthly limit" />
-             
               <NumberInput label="Max File Upload" value={settings.maxFileUploadMB} onChange={v => update('maxFileUploadMB', v)} suffix="MB" min={1} max={100} description="Per-attachment size limit" />
-           
             </div>
           </SectionCard>
 
-          {/* <SectionCard icon={Bell} iconColor="text-amber-400" title="Notifications" defaultOpen={false}>
-            <ToggleRow label="Email Notifications" description="Send email alerts for claim activities." value={settings.emailNotificationsEnabled} onChange={v => update('emailNotificationsEnabled', v)} />
-            <ToggleRow label="SMS Notifications" description="Send SMS alerts to secretaries for urgent actions." value={settings.smsNotificationsEnabled} onChange={v => update('smsNotificationsEnabled', v)} />
-            <ToggleRow label="Notify on New Claim" description="Alert secretary when a new claim is submitted." value={settings.notifyOnNewClaim} onChange={v => update('notifyOnNewClaim', v)} />
-            <ToggleRow label="Notify on Status Change" description="Notify students on approval/rejection." value={settings.notifyOnApproval} onChange={v => update('notifyOnApproval', v)} />
-            <div className="pt-4">
-              <TextInput label="Admin CC Email" value={settings.adminEmailCc} onChange={v => update('adminEmailCc', v)} placeholder="admin@institution.edu" description="CC'd on all critical notification emails" />
-            </div>
-          </SectionCard> */}
-
-          {/* <SectionCard icon={Lock} iconColor="text-red-400" title="Security Settings" defaultOpen={false}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <NumberInput label="Max Login Attempts" value={settings.maxLoginAttempts} onChange={v => update('maxLoginAttempts', v)} suffix="attempts" min={3} max={10} description="Before account lockout" />
-              <NumberInput label="Lockout Duration" value={settings.lockoutDurationMinutes} onChange={v => update('lockoutDurationMinutes', v)} suffix="mins" min={5} description="Duration of account lockout" />
-              <NumberInput label="Password Expiry" value={settings.passwordExpiryDays} onChange={v => update('passwordExpiryDays', v)} suffix="days" min={30} description="Force reset after N days" />
-            </div>
-            <ToggleRow label="Require Two-Factor Auth" description="Enforce 2FA for all secretary and admin accounts." value={settings.requireTwoFactor} onChange={v => update('requireTwoFactor', v)} />
-            <ToggleRow label="Allow Multiple Sessions" description="Allow same account to log in from multiple devices." value={settings.allowMultipleSessions} onChange={v => update('allowMultipleSessions', v)} />
-          </SectionCard> */}
-
-          {/* <SectionCard icon={Database} iconColor="text-cyan-400" title="Database & Server" defaultOpen={false}>
-            <ToggleRow label="Automatic DB Backups" description="Schedule regular database backups to cloud storage." value={settings.dbBackupEnabled} onChange={v => update('dbBackupEnabled', v)} />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-              <NumberInput label="Backup Frequency" value={settings.dbBackupFrequencyHours} onChange={v => update('dbBackupFrequencyHours', v)} suffix="hours" min={1} max={168} description="How often to run backup" />
-              <NumberInput label="Log Retention" value={settings.logRetentionDays} onChange={v => update('logRetentionDays', v)} suffix="days" min={30} description="Audit logs kept for N days" />
-              <NumberInput label="API Rate Limit" value={settings.rateLimitRequestsPerMin} onChange={v => update('rateLimitRequestsPerMin', v)} suffix="req/min" min={10} description="Per-IP API rate limit" />
-            </div>
-          </SectionCard> */}
         </div>
 
         {/* Sidebar — hidden on mobile unless toggled, always visible on xl */}
@@ -277,12 +254,14 @@ useEffect(() => {
             </h4>
             <div className="space-y-2.5">
               {[
-                { label: 'Portal Status', value: settings.portalActive ? 'Active' : 'Disabled', color: settings.portalActive ? 'text-green-400' : 'text-red-400' },
+                // --- UPDATED SIDEBAR STATUSES ---
+                { label: 'Mess Portal', value: settings.messPortalActive ? 'Active' : 'Disabled', color: settings.messPortalActive ? 'text-green-400' : 'text-red-400' },
+                { label: 'Fest Portal', value: settings.festPortalActive ? 'Active' : 'Disabled', color: settings.festPortalActive ? 'text-green-400' : 'text-red-400' },
+                { label: 'Hospital Portal', value: settings.hospitalPortalActive ? 'Active' : 'Disabled', color: settings.hospitalPortalActive ? 'text-green-400' : 'text-red-400' },
+                // --------------------------------
                 { label: 'Mess Rate', value: `₹${settings.messRebateRateDaily}/day`, color: 'text-slate-300' },
                 { label: 'Max Rebate Days', value: `${settings.maxMessRebateDays} days`, color: 'text-slate-300' },
                 { label: 'Max Fest Claim', value: `₹${settings.maxFestReimbursement.toLocaleString('en-IN')}`, color: 'text-slate-300' },
-                // { label: 'Auto-Approve', value: `< ₹${settings.autoApproveBelow}`, color: 'text-slate-300' },
-                // { label: 'Session Timeout', value: `${settings.sessionTimeoutMinutes} mins`, color: 'text-slate-300' },
                 { label: 'Log Retention', value: `${settings.logRetentionDays} days`, color: 'text-slate-300' },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between">
@@ -292,8 +271,6 @@ useEffect(() => {
               ))}
             </div>
           </div>
-
-          
 
         </div>
       </div>
