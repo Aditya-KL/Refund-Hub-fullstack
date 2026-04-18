@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Mail, Lock, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react';
+import { ForgotPasswordModal } from './ForgotPasswordModal';
+
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
 interface StudentLoginFormProps {
@@ -19,17 +21,20 @@ export function StudentLoginForm({ onBack, onSignIn, onRegister }: StudentLoginF
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?:  string; password?: string; server?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string; server?: string }>({});
+  
+  // Clean state just for the modal
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
+
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const validateForm = () => {
-  const newErrors: { email?: string; password?: string } = {};
-  if (!email.trim()) {
-    // ✅ Change the key to 'email' and the text to 'University email'
-    newErrors.email = 'University email is required'; 
-  } else if (!EMAIL_REGEX.test(email.trim())) {
-    newErrors.email = 'Please enter a valid email address';
-  }
+  const validateForm = () => {
+    const newErrors: { email?: string; password?: string } = {};
+    if (!email.trim()) {
+      newErrors.email = 'University email is required'; 
+    } else if (!EMAIL_REGEX.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
     if (!password) {
       newErrors.password = 'Password is required';
     } else if (password.length < 8) {
@@ -73,13 +78,10 @@ const validateForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex items-center justify-center p-6 relative">
       <div className="w-full max-w-md">
         {/* Navigation */}
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-        >
+        <button onClick={onBack} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors">
           <ArrowLeft size={20} />
           <span className="font-medium">Back to Login Options</span>
         </button>
@@ -94,21 +96,18 @@ const validateForm = () => {
             <p className="text-gray-600">Enter your email and password</p>
           </div>
 
-        {/* ✅ This makes the banner show the actual error (Email, Password, or Server) */}
-{(errors.server || errors.email || errors.password) && (
-  <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-    <AlertCircle className="text-red-600 mt-0.5 flex-shrink-0" size={18} />
-    <p className="text-sm text-red-700 font-medium">
-      {/* Priority: Server Error > Email Error > Password Error */}
-      {errors.server ? errors.server : (errors.email || errors.password)}
-    </p>
-  </div>
-)}
+          {(errors.server || errors.email || errors.password) && (
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="text-red-600 mt-0.5 flex-shrink-0" size={18} />
+              <p className="text-sm text-red-700 font-medium">
+                {errors.server ? errors.server : (errors.email || errors.password)}
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                Email ID
-              </label>
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">Email ID</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -125,18 +124,10 @@ const validateForm = () => {
                   }`}
                 />
               </div>
-              {errors.email && (
-                <div className="flex items-center gap-2 mt-2 text-red-600">
-                  <AlertCircle size={16} />
-                  <p className="text-sm">{errors.email}</p>
-                </div>
-              )}
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                Password
-              </label>
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -160,12 +151,6 @@ const validateForm = () => {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
-              {errors.password && (
-                <div className="flex items-center gap-2 mt-2 text-red-600">
-                  <AlertCircle size={16} />
-                  <p className="text-sm">{errors.password}</p>
-                </div>
-              )}
             </div>
 
             <div className="flex items-center justify-between">
@@ -173,7 +158,15 @@ const validateForm = () => {
                 <input type="checkbox" className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500" />
                 <span className="text-sm text-gray-700">Remember me</span>
               </label>
-              <a href="#" className="text-sm font-semibold text-green-600 hover:text-green-700">Forgot Password?</a>
+              
+              {/* Trigger for the modal */}
+              <button 
+                type="button" 
+                onClick={() => setIsForgotOpen(true)}
+                className="text-sm font-semibold text-green-600 hover:text-green-700"
+              >
+                Forgot Password?
+              </button>
             </div>
 
             <button
@@ -192,9 +185,7 @@ const validateForm = () => {
           </div>
 
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-center">
-            <p className="text-sm text-blue-800">
-              <span className="font-semibold">Note:</span> Your account must be verified.
-            </p>
+            <p className="text-sm text-blue-800"><span className="font-semibold">Note:</span> Your account must be verified.</p>
           </div>
         </div>
 
@@ -205,6 +196,13 @@ const validateForm = () => {
           </button>
         </div>
       </div>
+
+      {/* Render the modal component cleanly */}
+      <ForgotPasswordModal 
+        isOpen={isForgotOpen} 
+        onClose={() => setIsForgotOpen(false)} 
+      />
+      
     </div>
   );
 }

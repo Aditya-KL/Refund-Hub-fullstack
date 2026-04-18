@@ -41,9 +41,9 @@ const userSchema = new mongoose.Schema({
   isSuperAdmin: { type: Boolean, default: false },
   
   verificationToken: { type: String },
-  resetPasswordToken: { type: String },
-  resetPasswordExpires: { type: Date },
-lastLogin: { type: Date, default: null }, 
+  resetPasswordOtp: { type: String, default: null },
+  resetPasswordExpires: { type: Date, default: null },
+  lastLogin: { type: Date, default: null }, 
   
   // --- Student Specific Profile ---
   studentProfile: {

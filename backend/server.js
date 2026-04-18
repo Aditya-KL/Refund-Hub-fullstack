@@ -809,7 +809,114 @@ app.get('/api/claims/my-fests/:studentId', async (req, res) => {
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, '0.0.0.0', () => console.log(`📡 Server running on port ${PORT}`));
 
-// to keep backend alive on platforms like Render.com
+// ─── FORGOT PASSWORD FLOW ─────────────────────────────────────
+
+// 1. Send OTP
+app.post('/api/forgot-password/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User with this email not found.' });
+    }
+
+    // Generate a random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Set expiration to 2 minutes from now
+    user.resetPasswordOtp = otp;
+    user.resetPasswordExpires = Date.now() + 2 * 60 * 1000; 
+    await user.save();
+
+    // Send the email using your existing Nodemailer transporter
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Refund Hub - Password Reset OTP',
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827">
+          <h2 style="color:#166534">Reset your Password</h2>
+          <p>Hello ${user.fullName},</p>
+          <p>You requested to reset your password. Here is your 6-digit verification code:</p>
+          <div style="margin: 20px 0; padding: 15px; background: #f3f4f6; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #166534;">
+            ${otp}
+          </div>
+          <p style="color: #ef4444; font-size: 14px;"><strong>Note:</strong> This code is only valid for 2 minutes.</p>
+          <p>If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({ message: 'OTP sent successfully.' });
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(500).json({ message: 'Server error sending OTP.' });
+  }
+});
+
+// 2. Verify OTP
+app.post('/api/forgot-password/verify-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    
+    // Find user with matching email, matching OTP, and check if it hasn't expired
+    const user = await User.findOne({ 
+      email: email.toLowerCase(),
+      resetPasswordOtp: otp,
+      resetPasswordExpires: { $gt: Date.now() } // $gt means "greater than" current time
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired OTP.' });
+    }
+
+    res.status(200).json({ message: 'OTP verified successfully.' });
+  } catch (error) {
+    console.error('Verify OTP Error:', error);
+    res.status(500).json({ message: 'Server error verifying OTP.' });
+  }
+});
+
+// 3. Reset Password
+app.post('/api/forgot-password/reset', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    // Do one final check to ensure the OTP is still valid just in case they waited too long on the last screen
+    const user = await User.findOne({ 
+      email: email.toLowerCase(),
+      resetPasswordOtp: otp,
+      resetPasswordExpires: { $gt: Date.now() } 
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'OTP expired. Please request a new one.' });
+    }
+
+    // Hash the new password and save it
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.passwordChangedAt = new Date();
+    
+    // Clear the OTP fields so they can't be reused
+    user.resetPasswordOtp = null;
+    user.resetPasswordExpires = null;
+    
+    // Reset login attempts in case they were locked out
+    user.failedLoginAttempts = 0;
+    user.lockedUntil = undefined;
+
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successful.' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ message: 'Server error resetting password.' });
+  }
+});
+
+
+// ─── To keep the server alive on platforms like Render.com ───────────────────────────────
 const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${PORT}`;
 
 setInterval(() => {
