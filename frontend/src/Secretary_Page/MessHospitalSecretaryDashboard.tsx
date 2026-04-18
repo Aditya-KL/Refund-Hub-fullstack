@@ -396,7 +396,7 @@ function ClaimsPage({
   secretary: SecretaryUser | null;
 }) {
   const [selected, setSelected] = useState<Claim | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('pending');
   const [search, setSearch] = useState('');
   const [actionError, setActionError] = useState('');
   const cfg = deptConfig[dept];
@@ -882,6 +882,23 @@ function SecretaryDashboardShell({
     };
     load();
   }, [department]);
+
+  // ─── Heartbeat: Update secretary's lastLogin every 30 seconds ────────────────
+  useEffect(() => {
+    if (!user?._id) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`${BASE}/api/heartbeat/${user._id}`, { method: 'POST' });
+      } catch (error) {
+        console.error('Heartbeat error:', error);
+      }
+    };
+
+    sendHeartbeat(); // Send immediately on mount
+    const interval = setInterval(sendHeartbeat, 30000); // Then every 30 seconds
+    return () => clearInterval(interval);
+  }, [user?._id]);
 
   const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center h-64 gap-3">

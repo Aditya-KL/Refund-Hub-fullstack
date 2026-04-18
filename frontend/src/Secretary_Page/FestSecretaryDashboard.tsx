@@ -3,7 +3,7 @@ import {
   Home, Users, CheckSquare, Archive, User,
   Plus, Trash2, Star, Music, Zap, Globe, Mic,
   TrendingUp, Clock, CheckCircle, XCircle, AlertTriangle,
-  Search, RefreshCw, Eye,
+  Search, RefreshCw, Eye, Circle,
   RotateCcw, DollarSign, Pencil, Save, X, KeyRound, Loader2,
 } from 'lucide-react';
 import {
@@ -33,10 +33,22 @@ type FestCoordinator = {
   email: string;
   festName: string;
   assignedAt: string;
+  lastLogin?: string | null;
   isActive: boolean;
 };
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// ─── Check if user is currently online (active within last 10 minutes) ─────────
+function isUserOnline(lastLogin: string | null | undefined): boolean {
+  if (!lastLogin) return false;
+  const date = new Date(lastLogin);
+  if (isNaN(date.getTime())) return false;
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInMins = Math.floor(diffInMs / 60000);
+  return diffInMins <= 10; // Online if active within last 10 minutes
+}
 
 // ─── Status mapper: backend → frontend ────────────────────────────────────────
 function mapStatus(backendStatus: string): Claim['status'] {
@@ -384,7 +396,14 @@ function OverviewPage({ claims, fcList }: { claims: Claim[]; fcList: FestCoordin
                   <p className="text-sm font-semibold text-slate-700 truncate">{fc.fullName}</p>
                   <p className="text-xs text-slate-400">{fc.studentRoll} · {fc.festName}</p>
                 </div>
-                <span className="text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full font-semibold">Active</span>
+                <span className={`text-xs flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold ${
+                  isUserOnline(fc.lastLogin) 
+                    ? 'text-green-600 bg-green-50' 
+                    : 'text-slate-500 bg-slate-100'
+                }`}>
+                  <Circle size={4} className={isUserOnline(fc.lastLogin) ? 'fill-green-600' : 'fill-slate-500'} />
+                  {isUserOnline(fc.lastLogin) ? 'Online' : 'Offline'}
+                </span>
               </div>
             );
           })}
@@ -476,6 +495,7 @@ function LiveStudentSearch({
         email: m.user.email,
         festName: fest,
         assignedAt: m.createdAt,
+        lastLogin: m.user.lastLogin || null,
         isActive: true,
       };
       onAdd(newFC);
@@ -776,7 +796,7 @@ function ApproveReimbursementsPage({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
-  const queue = claims.filter(c => c.status === 'verified');
+  const queue = claims.filter(c => c.status === 'pending');
   const filtered = queue.filter(c => {
     const ms = search.toLowerCase();
     return (
@@ -971,9 +991,9 @@ function VerifiedPage({
 }) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected' | 'disbursed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'approved' | 'rejected' | 'disbursed'>('all');
 
-  const verified = claims.filter(c => ['approved', 'rejected', 'disbursed'].includes(c.status));
+  const verified = claims.filter(c => c.status === 'verified');
   const filtered = verified.filter(c => {
     const ms = search.toLowerCase();
     return (
@@ -1230,6 +1250,7 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
           email: m.user.email,
           festName: m.fest?.name || '',
           assignedAt: m.createdAt,
+          lastLogin: m.user.lastLogin || null,
           isActive: m.isActive,
         }));
         setFcList(mapped);
@@ -1241,7 +1262,28 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
       }
     };
     fetchFestData();
+    
+    // Auto-refresh fest coordinators every 15 seconds to show real-time online status
+    const interval = setInterval(fetchFestData, 15000);
+    return () => clearInterval(interval);
   }, []);
+
+  // ─── Heartbeat: Update secretary's lastLogin every 30 seconds ────────────────
+  useEffect(() => {
+    if (!user?._id) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`${BASE}/api/heartbeat/${user._id}`, { method: 'POST' });
+      } catch (error) {
+        console.error('Heartbeat error:', error);
+      }
+    };
+
+    sendHeartbeat(); // Send immediately on mount
+    const interval = setInterval(sendHeartbeat, 30000); // Then every 30 seconds
+    return () => clearInterval(interval);
+  }, [user?._id]);
 
   const navItems = [
     { id: 'overview', label: 'Overview',       icon: Home },

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Home, CheckSquare, History, User, Download, Eye, XCircle,
   Clock, CheckCircle2, Loader2, RefreshCw, Users, BarChart3,
+  Check, X,
 } from 'lucide-react';
 import {
   SecretaryLayout, SecretaryProfileView, StatCard,
@@ -75,7 +76,7 @@ function inferDept(type: string): Department {
 }
 
 function mapAccountClaim(doc: any): AccountClaim {
-  const bank = doc.student?.studentProfile?.bankDetails || {};
+  const bank = doc.student?.bankDetails || {};
   return {
     _id: doc._id,
     claimId: doc.claimId || String(doc._id).slice(-8).toUpperCase(),
@@ -277,11 +278,15 @@ function ApproveRefundPage(props: {
   underProcessBatches: UnderProcessBatch[];
   onExportBatch: () => void;
   onMarkBatchRefunded: (batchId: string) => void;
+  onMarkClaimRefunded: (claimId: string) => void;
+  onRejectClaim: (claimId: string) => void;
   exportLoading: boolean;
   refundingBatchId: string;
   actionError: string;
+  processingId: string | null;
+  setProcessingId: (id: string | null) => void;
 }) {
-  const { pendingClaims, underProcessBatches, onExportBatch, onMarkBatchRefunded, exportLoading, refundingBatchId, actionError } = props;
+  const { pendingClaims, underProcessBatches, onExportBatch, onMarkBatchRefunded, onMarkClaimRefunded, onRejectClaim, exportLoading, refundingBatchId, actionError, processingId, setProcessingId } = props;
   const [selectedClaim, setSelectedClaim] = useState<AccountClaim | null>(null);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState<Department | 'all'>('all');
@@ -391,9 +396,27 @@ function ApproveRefundPage(props: {
                     <td className="px-4 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">{claim.ifscCode || '—'}</td>
                     <td className="px-4 py-4 font-black text-emerald-700 whitespace-nowrap">₹{claim.amount.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-4">
-                      <button onClick={() => setSelectedClaim(claim)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg">
-                        <Eye size={15} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => { setProcessingId(claim._id); onMarkClaimRefunded(claim._id); }}
+                          disabled={processingId === claim._id}
+                          className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50"
+                          title="Mark as Refunded"
+                        >
+                          {processingId === claim._id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                        </button>
+                        <button 
+                          onClick={() => { setProcessingId(claim._id); onRejectClaim(claim._id); }}
+                          disabled={processingId === claim._id}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
+                          title="Reject Refund"
+                        >
+                          {processingId === claim._id ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}
+                        </button>
+                        <button onClick={() => setSelectedClaim(claim)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg">
+                          <Eye size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -584,6 +607,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
   const [exportLoading, setExportLoading] = useState(false);
   const [refundingBatchId, setRefundingBatchId] = useState('');
   const [actionError, setActionError] = useState('');
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -648,6 +672,23 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
   useEffect(() => { loadClaims(); }, []);
   useEffect(() => { loadHistory(); }, []);
 
+  // ─── Heartbeat: Update secretary's lastLogin every 30 seconds ────────────────
+  useEffect(() => {
+    if (!user?._id) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`${BASE}/api/heartbeat/${user._id}`, { method: 'POST' });
+      } catch (error) {
+        console.error('Heartbeat error:', error);
+      }
+    };
+
+    sendHeartbeat(); // Send immediately on mount
+    const interval = setInterval(sendHeartbeat, 30000); // Then every 30 seconds
+    return () => clearInterval(interval);
+  }, [user?._id]);
+
   const underProcessBatches = useMemo(() => buildUnderProcessBatches(underProcessClaims), [underProcessClaims]);
 
   const handleExportBatch = async () => {
@@ -698,6 +739,53 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
     }
   };
 
+  const handleMarkClaimRefunded = async (claimId: string) => {
+    if (!user?._id) return;
+    setActionError('');
+    try {
+      const res = await fetch(`${BASE}/api/verify/claims/${claimId}/mark-refunded`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          refundedBy: user._id,
+          refundedByName: user.fullName,
+          notes: 'Marked as refunded by accounts secretary',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to mark refunded.');
+      await Promise.all([loadClaims(), loadHistory()]);
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to mark claim refunded.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectClaim = async (claimId: string) => {
+    if (!user?._id) return;
+    setActionError('');
+    try {
+      const res = await fetch(`${BASE}/api/verify/claims/${claimId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rejectedBy: user._id,
+          rejectedByName: user.fullName,
+          rejectionReason: 'Rejected by accounts secretary during processing',
+          stage: 'ACCOUNTS_PROCESSING',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to reject claim.');
+      await loadClaims();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to reject claim.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const navItems = [
     { id: 'overview', label: 'Overview', icon: Home },
     { id: 'approve', label: 'Approve Refunds', icon: CheckSquare },
@@ -732,9 +820,13 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
               underProcessBatches={underProcessBatches}
               onExportBatch={handleExportBatch}
               onMarkBatchRefunded={handleMarkBatchRefunded}
+              onMarkClaimRefunded={handleMarkClaimRefunded}
+              onRejectClaim={handleRejectClaim}
               exportLoading={exportLoading}
               refundingBatchId={refundingBatchId}
               actionError={actionError}
+              processingId={processingId}
+              setProcessingId={setProcessingId}
             />
       )}
 

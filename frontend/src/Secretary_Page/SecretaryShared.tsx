@@ -192,22 +192,22 @@ export const deptConfig = {
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
     PENDING_MESS_MANAGER: { label: 'Pending Verification', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-    PENDING_ACADEMIC:     { label: 'Pending Verification', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-    PENDING_COORD:        { label: 'Pending Coordinator',  cls: 'bg-orange-100 text-orange-700 border-orange-200' },
-    PENDING_FC:           { label: 'Pending FC',           cls: 'bg-violet-100 text-violet-700 border-violet-200' },
-    VERIFIED_MESS:        { label: 'Verified',             cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-    VERIFIED_MEDICAL:     { label: 'Verified',             cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-    VERIFIED_FEST:        { label: 'Verified by FC',       cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-    APPROVED:             { label: 'Approved',             cls: 'bg-green-100 text-green-700 border-green-200' },
-    PUSHED_TO_ACCOUNTS:   { label: 'Sent to Accounts',    cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
-    REJECTED:             { label: 'Rejected',             cls: 'bg-red-100 text-red-700 border-red-200' },
-    REFUNDED:             { label: 'Refunded',             cls: 'bg-purple-100 text-purple-700 border-purple-200' },
+    PENDING_ACADEMIC: { label: 'Pending Verification', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    PENDING_COORD: { label: 'Pending Coordinator', cls: 'bg-orange-100 text-orange-700 border-orange-200' },
+    PENDING_FC: { label: 'Pending FC', cls: 'bg-violet-100 text-violet-700 border-violet-200' },
+    VERIFIED_MESS: { label: 'Verified', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+    VERIFIED_MEDICAL: { label: 'Verified', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+    VERIFIED_FEST: { label: 'Verified by FC', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+    APPROVED: { label: 'Approved', cls: 'bg-green-100 text-green-700 border-green-200' },
+    PUSHED_TO_ACCOUNTS: { label: 'Sent to Accounts', cls: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+    REJECTED: { label: 'Rejected', cls: 'bg-red-100 text-red-700 border-red-200' },
+    REFUNDED: { label: 'Refunded', cls: 'bg-purple-100 text-purple-700 border-purple-200' },
     // frontend-mapped statuses
-    pending:              { label: 'Pending Verification', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-    verified:             { label: 'Verified',             cls: 'bg-blue-100 text-blue-700 border-blue-200' },
-    approved:             { label: 'Approved',             cls: 'bg-green-100 text-green-700 border-green-200' },
-    rejected:             { label: 'Rejected',             cls: 'bg-red-100 text-red-700 border-red-200' },
-    disbursed:            { label: 'Disbursed',            cls: 'bg-purple-100 text-purple-700 border-purple-200' },
+    pending: { label: 'Pending Verification', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+    verified: { label: 'Verified', cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+    approved: { label: 'Approved', cls: 'bg-green-100 text-green-700 border-green-200' },
+    rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-700 border-red-200' },
+    disbursed: { label: 'Disbursed', cls: 'bg-purple-100 text-purple-700 border-purple-200' },
   };
   const entry = map[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600 border-gray-200' };
   return (
@@ -345,29 +345,62 @@ export function SecretaryLayout({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
           {children}
         </div>
+<nav
+  className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t"
+  style={{
+    background: '#ffffff',
+    borderColor: '#e2e8f0'
+  }}
+>
+  <div className="flex items-stretch h-16">
+    {navItems.slice(0, 4).map(item => {
+      const active = activeView === item.id;
+      const Icon = item.icon;
 
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40"
-          style={{ background: cfg.sidebarBg, borderTop: `1px solid rgba(255,255,255,0.1)` }}>
-          <div className="flex items-stretch h-16">
-            {navItems.slice(0, 4).map(item => {
-              const Icon = item.icon;
-              const active = activeView === item.id;
-              return (
-                <button key={item.id} onClick={() => setActiveView(item.id)}
-                  className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors ${active ? 'text-white' : 'text-white/40'}`}>
-                  {active && (
-                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-b-full" style={{ background: cfg.accent }} />
-                  )}
-                  <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
-                  <span className="text-[10px] font-medium truncate px-1">{item.label.split(' ')[0]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
+      return (
+        <button
+          key={item.id}
+          onClick={() => setActiveView(item.id)}
+          className="flex flex-col items-center justify-center flex-1 relative transition-all"
+        >
+          {/* Active indicator line */}
+          <div
+            className={`absolute top-0 left-1/2 -translate-x-1/2 h-1 w-6 rounded-full transition-all ${
+              active ? '' : 'opacity-0'
+            }`}
+            style={{ background: cfg.accent }}
+          />
+
+          {/* Icon */}
+          <Icon
+            size={20}
+            className={`transition-all ${
+              active
+                ? 'scale-110'
+                : ''
+            }`}
+            style={{
+              color: active ? cfg.accent : '#64748b'
+            }}
+          />
+
+          {/* Label */}
+          <span
+            className="text-xs mt-1 font-semibold"
+            style={{
+              color: active ? cfg.accent : '#64748b'
+            }}
+          >
+            {item.label}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+</nav>
       </div>
     </div>
   );
@@ -736,7 +769,7 @@ export function SecretaryClaimsView({ department, secretary }: ClaimsListViewPro
           hospital: 'PENDING_ACADEMIC,VERIFIED_MEDICAL,APPROVED,REJECTED',
           fest: 'VERIFIED_FEST,APPROVED,REJECTED,PUSHED_TO_ACCOUNTS',
         };
-        url = `${API_BASE}/api/verify/claims?type=${typeMap[department]}&status=${statusMap[department]}`;
+        url = `${API_BASE}/api/verify/claims/department?type=${typeMap[department]}&status=${statusMap[department]}`;
       }
       const res = await fetch(url);
       if (res.ok) setClaims(await res.json());
@@ -932,9 +965,8 @@ export function SecretaryClaimsView({ department, secretary }: ClaimsListViewPro
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${
-                filterStatus === s ? 'text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-              }`}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors border ${filterStatus === s ? 'text-white border-transparent' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                }`}
               style={filterStatus === s ? { background: cfg.accent, borderColor: cfg.accent } : {}}
             >
               {statusLabelMap[s] || s}
