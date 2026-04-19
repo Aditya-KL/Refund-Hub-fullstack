@@ -459,7 +459,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
     activeMenuItem === 'refunds'               ? 'Refunds & Settlements' :
     activeMenuItem === 'history'               ? 'Claim History' :
     activeMenuItem === 'manage-team'           ? 'Manage Team' :
-    activeMenuItem === 'approve-reimbursement' ? 'Verify Reimbursements' :
+    activeMenuItem === 'approve-reimbursement' ? 'Approve Reimbursements' :
     activeMenuItem === 'settings'              ? 'Settings' :
     'Refund Hub';
 
@@ -573,13 +573,14 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
               Coordinator sees only Coordinator and Sub-Coordinator columns.
               Both can add members (FC can add Coord + SubCoord, Coord can add only SubCoord).
               Both can remove members strictly below their own rank. */}
+          {/* ── Manage Team ── */}
           {activeMenuItem === 'manage-team' && effectiveRole && managementFests.length > 0 && (
             <ManageTeamView
-              currentUserPosition={effectiveRole}
               userFests={managementFests.map(f => ({
                 _id: f.festId,
                 festName: f.festName,
                 academicYear: f.academicYear,
+                userRole: f.position 
               }))}
               currentUserId={loggedInUser._id}
               currentUserRollNo={loggedInUser.studentId}
