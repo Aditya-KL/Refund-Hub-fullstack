@@ -4,7 +4,7 @@ import {
   DollarSign, Activity, Crown, LogOut, UserPlus, Circle,
   Menu, X, User, Trash2, Plus, Eye, EyeOff, Search,
   Filter, RefreshCw, ChevronLeft, ChevronRight,
-  AlertTriangle, CheckCircle, Clock, MoreVertical,
+  AlertTriangle, CheckCircle, Clock, MoreVertical, ChevronDown
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PortalSettingsView } from './PortalSettingsView';
@@ -132,6 +132,7 @@ function AddSecretaryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s:
   const [showPwd, setShowPwd] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [deptOpen, setDeptOpen] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -199,10 +200,18 @@ function AddSecretaryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s:
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Phone</label>
               <input
-                type="tel" value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="9876543210"
-                className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${errors.phone ? 'border-red-500' : 'border-slate-600'}`}
+                type="text" 
+                maxLength={10} 
+                value={form.phone} 
+                onChange={e => {
+                  let val = e.target.value.replace(/\D/g, '');
+                  if (val.startsWith('0')) {
+                    val = val.slice(1);
+                  }
+                  setForm({ ...form, phone: val.slice(0, 10) });
+                }}
+                className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 ${errors.phone ? 'border-red-500' : 'border-slate-600'}`}
+                placeholder="10-digit number"
               />
               {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
             </div>
@@ -224,16 +233,49 @@ function AddSecretaryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s:
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Department</label>
-            <select
-              value={form.department}
-              onChange={e => setForm(f => ({ ...f, department: e.target.value as any }))}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="mess">Mess Department</option>
-              <option value="hospital">Medical Department</option>
-              <option value="fest">Cultural & Fest Cell</option>
-              <option value="account">Accounts Department</option>
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDeptOpen(!deptOpen)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-900 border border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white hover:bg-slate-800 transition-colors"
+              >
+                <span className={form.department ? "text-white" : "text-slate-400"}>
+                  {form.department === 'account' ? 'Accounts Department' :
+                   form.department === 'mess' ? 'Mess Department' :
+                   form.department === 'hospital' ? 'Medical Department' :
+                   form.department === 'fest' ? 'Cultural & Fest Cell' : 'Select Department'}
+                </span>
+                <ChevronDown size={15} className={`text-slate-400 transition-transform ${deptOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {deptOpen && (
+                <>
+                  <div className="fixed inset-0 z-[110]" onClick={() => setDeptOpen(false)} />
+                  <div className="absolute z-[120] w-full mb-1 bottom-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-48 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
+                    {[
+                      { id: 'mess', label: 'Mess Department' },
+                      { id: 'hospital', label: 'Medical Department' },
+                      { id: 'fest', label: 'Cultural & Fest Cell' },
+                      { id: 'account', label: 'Accounts Department' }
+                    ].map(dept => (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => { 
+                          setForm({ ...form, department: dept.id as any }); 
+                          setDeptOpen(false); 
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                          form.department === dept.id ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {dept.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-slate-700">
@@ -1038,16 +1080,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 <p className="text-xs text-slate-400 hidden sm:block">{pageTitles[activeView]?.sub}</p>
               </div>
             </div>
-            {/* <div className="flex items-center gap-2.5">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-slate-500">Portal Status</p>
-                <p className={`text-xs font-bold ${portalActive ? 'text-green-400' : 'text-red-400'}`}>{portalActive ? 'ACTIVE' : 'DISABLED'}</p>
-              </div>
-              <button onClick={() => setPortalActive(v => !v)}
-                className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors ${portalActive ? 'bg-green-600' : 'bg-red-600'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${portalActive ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div> */}
           </div>
         </div>
 
