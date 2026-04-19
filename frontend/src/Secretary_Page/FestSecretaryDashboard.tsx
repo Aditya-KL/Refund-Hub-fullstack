@@ -4,7 +4,7 @@ import {
   Plus, Trash2, Star, Music, Zap, Globe, Mic,
   TrendingUp, Clock, CheckCircle, XCircle, AlertTriangle,
   Search, RefreshCw, Eye, Circle,
-  RotateCcw, DollarSign, Pencil, Save, X, KeyRound, Loader2,
+  DollarSign, Pencil, Save, X, KeyRound, Loader2,
 } from 'lucide-react';
 import {
   SecretaryLayout, ClaimReviewPanel,
@@ -801,7 +801,7 @@ function ApproveReimbursementsPage({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
-  const queue = claims.filter(c => c.status === 'pending');
+  const queue = claims.filter(c => c.status === 'verified');
   const filtered = queue.filter(c => {
     const ms = search.toLowerCase();
     return (
@@ -870,10 +870,10 @@ function ApproveReimbursementsPage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Approve Reimbursements</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Claims verified by FCs — awaiting your final approval</p>
+          <p className="text-slate-500 text-sm mt-0.5">Claims verified by FCs and ready for final approval</p>
         </div>
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-xl text-sm font-bold self-start sm:self-auto">
-          <Clock size={14} /> {queue.length} pending
+          <Clock size={14} /> {queue.length} verified
         </span>
       </div>
 
@@ -913,8 +913,8 @@ function ApproveReimbursementsPage({
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 text-center">
           <CheckCircle size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="font-semibold text-slate-400">No claims awaiting approval</p>
-          <p className="text-slate-300 text-sm mt-1">All verified claims have been processed</p>
+          <p className="font-semibold text-slate-400">No verified claims awaiting approval</p>
+          <p className="text-slate-300 text-sm mt-1">All verified claims are already processed</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -985,59 +985,29 @@ function ApproveReimbursementsPage({
 }
 
 // ─── Verified Reimbursements ───────────────────────────────────────────────────
-function VerifiedPage({
-  claims,
-  setClaims,
-  currentUser,
-}: {
-  claims: Claim[];
-  setClaims: React.Dispatch<React.SetStateAction<Claim[]>>;
-  currentUser: SecretaryUser | null;
-}) {
+function HistoryPage({ claims }: { claims: Claim[] }) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'approved' | 'rejected' | 'disbursed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected' | 'disbursed'>('all');
 
-  const verified = claims.filter(c => c.status === 'verified');
-  const filtered = verified.filter(c => {
+  const historyClaims = claims.filter(c => ['approved', 'rejected', 'disbursed'].includes(c.status));
+  const filtered = historyClaims.filter(c => {
     const ms = search.toLowerCase();
     return (
       (statusFilter === 'all' || c.status === statusFilter) &&
       (
         (c.studentName ?? '').toLowerCase().includes(ms) ||
-        (c.claimRefId ?? '').toLowerCase().includes(ms)
+        (c.claimRefId ?? '').toLowerCase().includes(ms) ||
+        (c.studentRoll ?? '').toLowerCase().includes(ms)
       )
     );
   });
 
-  const handleUnverify = async (id: string) => {
-    const stored = currentUser || JSON.parse(localStorage.getItem('user') || '{}');
-    try {
-      const res = await fetch(`${BASE}/api/admin/update-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          claimId: id,
-          status: 'VERIFIED_FEST',
-          remarks: `Reverted to Verified by ${stored.fullName}`,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Revert failed');
-      setClaims(prev =>
-        prev.map(c => c._id === id ? { ...c, status: 'verified' } : c)
-      );
-    } catch (err: any) {
-      console.error('Revert failed:', err.message);
-      // optionally surface this to the user via a toast/alert
-    }
-  };
-
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Verified Reimbursements</h2>
-        <p className="text-slate-500 text-sm mt-0.5">All processed claims — you can still revert approved ones</p>
+        <h2 className="text-xl font-bold text-slate-800">History</h2>
+        <p className="text-slate-500 text-sm mt-0.5">Approved, rejected, and refunded reimbursement records</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -1046,7 +1016,7 @@ function VerifiedPage({
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search claims..."
+            placeholder="Search by ref ID, student, roll no..."
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
           />
         </div>
@@ -1068,7 +1038,7 @@ function VerifiedPage({
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-16 text-center text-slate-400">
-            <p className="text-sm">No claims found</p>
+            <p className="text-sm">No history records found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1103,24 +1073,13 @@ function VerifiedPage({
                         : '—'}
                     </td>
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSelected(claim)}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                          title="View"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        {claim.status === 'approved' && (
-                          <button
-                            onClick={() => handleUnverify(claim._id)}
-                            className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Revert to Verified"
-                          >
-                            <RotateCcw size={14} />
-                          </button>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => setSelected(claim)}
+                        className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        title="View"
+                      >
+                        <Eye size={14} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1294,7 +1253,7 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
     { id: 'overview', label: 'Overview',       icon: Home },
     { id: 'appoint',  label: 'Appoint FC',     icon: Users },
     { id: 'approve',  label: 'Approve Reimb.',  icon: CheckSquare },
-    { id: 'verified', label: 'Verified',        icon: Archive },
+    { id: 'history',  label: 'History',         icon: Archive },
     { id: 'profile',  label: 'Profile',         icon: User },
   ];
 
@@ -1370,12 +1329,13 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
         claimsError   ? renderClaimsError() :
         <ApproveReimbursementsPage claims={claims} setClaims={setClaims} currentUser={user} />
       )}
-      {activeView === 'verified' && (
+      {activeView === 'history' && (
         claimsLoading ? <LoadingSpinner /> :
         claimsError   ? renderClaimsError() :
-        <VerifiedPage claims={claims} setClaims={setClaims} currentUser={user} />
+        <HistoryPage claims={claims} />
       )}
       {activeView === 'profile'  && <DynamicProfilePage user={user} setUser={setUser} />}
     </SecretaryLayout>
   );
 }
+
