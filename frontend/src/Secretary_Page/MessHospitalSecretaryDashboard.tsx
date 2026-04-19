@@ -635,15 +635,31 @@ function ApprovedHistoryPage({
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'disbursed' | 'rejected'>('all');
   const [actionError, setActionError] = useState('');
   const cfg = deptConfig[dept];
+  const allViewStatusOrder: Record<string, number> = {
+    approved: 0,
+    rejected: 1,
+    disbursed: 2,
+  };
 
   const processedClaims = claims.filter(c => ['approved', 'disbursed', 'rejected'].includes(c.status));
-  const filtered = processedClaims.filter(c => {
-    const ms = search.toLowerCase();
-    const name = c.student?.fullName || c.studentName || '';
-    const ref = c.claimRefId || c.claimId || '';
-    return (statusFilter === 'all' || c.status === statusFilter) &&
-      (name.toLowerCase().includes(ms) || ref.toLowerCase().includes(ms));
-  });
+  const filtered = processedClaims
+    .filter(c => {
+      const ms = search.toLowerCase();
+      const name = c.student?.fullName || c.studentName || '';
+      const ref = c.claimRefId || c.claimId || '';
+      return (statusFilter === 'all' || c.status === statusFilter) &&
+        (name.toLowerCase().includes(ms) || ref.toLowerCase().includes(ms));
+    })
+    .sort((a, b) => {
+      if (statusFilter === 'all') {
+        const byStatus = (allViewStatusOrder[a.status] ?? 99) - (allViewStatusOrder[b.status] ?? 99);
+        if (byStatus !== 0) return byStatus;
+      }
+
+      const aTime = new Date(a.approvedAt || a.refundedAt || a.rejectedAt || a.submittedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.approvedAt || b.refundedAt || b.rejectedAt || b.submittedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
 
   const handleUndoApproval = async (id: string) => {
     if (!secretary) return;
