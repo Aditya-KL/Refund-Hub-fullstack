@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
-const refundRequest = new mongoose.Schema({
+const refundRequestSchema = new mongoose.Schema({
   // ── Core Identity ───────────────────────────────────────────
   claimId: { type: String, required: true, unique: true, index: true },
   
-  // Link to the User model (ObjectId for joins, Roll for quick display)
+  // Link to the User model
   student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   studentRoll: { type: String, required: true, uppercase: true },
   
@@ -16,127 +16,92 @@ const refundRequest = new mongoose.Schema({
     index: true
   },
   
-  // Optional Fest-Specific Fields
-  festId: { type: mongoose.Schema.Types.ObjectId, ref: 'Fest', default: null, index: true },
-  festMember: { type: mongoose.Schema.Types.ObjectId, ref: 'FestMember', default: null, index: true },
-  festName: { type: String, trim: true },
-  committeeName: { type: String, trim: true, default: '' },
-  submitterFestPosition: {
-    type: String,
-    enum: ['FEST_COORDINATOR', 'COORDINATOR', 'SUB_COORDINATOR', null],
-    default: null,
-  },
-  teamName: { type: String, trim: true },
+  // ── Mess-Specific Fields (Updated for capping logic) ────────
   messAbsenceFrom: { type: Date, default: null },
-  messAbsenceTo: { type: Date, default: null },
-  messAbsenceDays: { type: Number, default: null },
+  messAbsenceTo:   { type: Date, default: null },
+  messAbsenceDays: { type: Number, default: null }, // Actual days student was away
   
+  // 🔥 NEW: These store the capped values based on semester limits
+  effectiveMessDays: { type: Number, default: null }, // e.g., away for 20, but limit is 15
+  effectiveAmount:   { type: Number, default: null }, // effectiveMessDays * rate
+
+  // ── Fest-Specific Fields ────────────────────────────────────
+  festId:       { type: mongoose.Schema.Types.ObjectId, ref: 'Fest', default: null, index: true },
+  festMember:   { type: mongoose.Schema.Types.ObjectId, ref: 'FestMember', default: null, index: true },
+  festName:     { type: String, trim: true },
+  committeeName: { type: String, trim: true, default: '' },
+  teamName:     { type: String, trim: true },
+  submitterFestPosition: { type: String, default: null },
+
   // ── Details & Financials ────────────────────────────────────
-  title:       { type: String, required: true, trim: true }, // Short summary
+  title:       { type: String, required: true, trim: true }, 
   description: { type: String, required: true, trim: true },
-  amount:      { type: Number, required: true, min: 0 },
+  amount:      { type: Number, required: true, min: 0 }, // The "Requested" amount
   
   transactionId: { 
     type: String, 
-    unique: true, // 👈 THE MAGIC SHIELD
-    sparse: true, // Allows Mess Rebates to NOT have a transaction ID
+    unique: true, 
+    sparse: true, 
     validate: {
       validator: function(v) {
-        if (!v) return true; // Skip if empty
-        return /^[A-Za-z0-9._/-]{6,30}$/.test(v); // Payment refs vary by provider
+        if (!v) return true;
+        return /^[A-Za-z0-9._/-]{6,30}$/.test(v);
       },
       message: props => `${props.value} is not a valid transaction reference.`
     }
   },
 
-  // ── Supporting Documents (Upgraded for Cloudinary) ──────────
+  // ── Supporting Documents ────────────────────────────────────
   attachments: [{
     filename:    { type: String },
-    url:         { type: String, required: true }, // The Cloudinary URL
+    url:         { type: String, required: true }, 
     mimetype:    { type: String },
     uploadedAt:  { type: Date, default: Date.now },
   }],
   
-  // ── Workflow Engine (Updated for verifyrebate.js flows) ─────
+  // ── Workflow Status ─────────────────────────────────────────
   status: { 
     type: String, 
     enum: [
-      // Submission States
-      'PENDING_TEAM_COORD', 'PENDING_COORD', 
-      'PENDING_FEST_COORD', 'PENDING_FC', 
-      'PENDING_MESS_MANAGER',
-      'PENDING_VP', 
-      'PENDING_ACADEMIC',
-      // Verification States
+      'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FEST_COORD', 
+      'PENDING_FC', 'PENDING_MESS_MANAGER', 'PENDING_VP', 'PENDING_ACADEMIC',
       'VERIFIED_MESS', 'VERIFIED_FEST', 'VERIFIED_MEDICAL',
-      // Finalized States
-      'APPROVED', 
-      'PUSHED_TO_ACCOUNTS',
-      'UNDER_PROCESS',
-      'REJECTED', 
-      'REFUNDED'
+      'APPROVED', 'PUSHED_TO_ACCOUNTS', 'UNDER_PROCESS', 'REJECTED', 'REFUNDED'
     ],
     required: true,
     index: true
   },
 
-  // ============================================================
-  // ── VERIFICATION & APPROVAL FIELDS (verifyrebate.js) ────────
-  // ============================================================
-
-  // ── Verification chain ──
+  // ── Verification & Approval Trail ──────────────────────────
   verifications: [{
-    stage:        { type: String },          // 'COORDINATOR' | 'FEST_COORDINATOR' | 'MESS_MANAGER' | 'ACADEMIC'
+    stage:        { type: String },
     verifiedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     verifierName: { type: String },
     verifiedAt:   { type: Date },
     remarks:      { type: String, default: '' },
   }],
 
-  // ── Secretary / dept verification ──
-  verifiedBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  verifiedByName:   { type: String },
-  verifiedAt:       { type: Date },
-  verifierRemarks:  { type: String, default: '' },
+  verifiedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  verifiedByName: { type: String },
+  verifiedAt:     { type: Date },
 
-  // ── Mess: effective values after cap ──
-  effectiveMessDays: { type: Number },   // capped at maxMessRebateDays
-  effectiveAmount:   { type: Number },   // effectiveMessDays * messRebateRateDaily
+  approvedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  approvedByName: { type: String },
+  approvedAt:     { type: Date },
 
-  // ── Approval ──
-  approvedBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  approvedByName:   { type: String },
-  approvedAt:       { type: Date },
-  approverRemarks:  { type: String, default: '' },
+  rejectedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  rejectionReason: { type: String, default: '' },
 
-  // ── Rejection (any stage) ──
-  rejectedBy:       { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  rejectedByName:   { type: String },
-  rejectedAt:       { type: Date },
-  rejectionReason:  { type: String, default: '' },
-  rejectedAtStage:  { type: String, default: '' },
+  // ── Final Refund Details ────────────────────────────────────
+  disbursedAmount: { type: Number },
+  disbursementRef: { type: String }, 
+  refundedAt:      { type: Date },
 
-  // ── Refund / Disbursement ──
-  refundedBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  refundedByName:    { type: String },
-  refundedAt:        { type: Date },
-  disbursedAmount:   { type: Number },
-  disbursementRef:   { type: String }, // UTR generated by Accounts
-  disbursementNotes: { type: String, default: '' },
-  accountsBatchId:   { type: String, default: '' },
-  accountsBatchStatus: { type: String, enum: ['', 'UNDER_PROCESS', 'REFUNDED'], default: '' },
-  accountsExportedAt: { type: Date },
-  accountsExportedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  accountsExportedByName: { type: String, default: '' },
-
-  // ── Expiry ──
   expiresAt: { type: Date },
 
-  // ============================================================
-
-  // ── Audit Trail (Multi-step History) ────────────────────────
+  // ── Multi-step History ──────────────────────────────────────
   history: [{
-    action:   { type: String, required: true }, // e.g., "SUBMITTED", "VERIFIED_BY_MESS_MANAGER"
+    action:   { type: String, required: true },
     byUser:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     byName:   { type: String }, 
     date:     { type: Date, default: Date.now },
@@ -145,10 +110,7 @@ const refundRequest = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// ── Database Indexes (For high-performance queries) ───────────
-refundRequest.index({ status: 1, requestType: 1 });
-refundRequest.index({ student: 1, createdAt: -1 });
-refundRequest.index({ requestType: 1, festId: 1, committeeName: 1, status: 1 });
+// ── Compound Index for the Overlap Check ──────────────────────
+refundRequestSchema.index({ student: 1, messAbsenceFrom: 1, messAbsenceTo: 1, status: 1 });
 
-// ✅ SAFE EXPORTS (Prevents OverwriteModelError)
-module.exports = mongoose.models.RefundRequest || mongoose.model('RefundRequest', refundRequest);
+module.exports = mongoose.models.RefundRequest || mongoose.model('RefundRequest', refundRequestSchema);

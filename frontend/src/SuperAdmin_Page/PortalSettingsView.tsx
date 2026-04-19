@@ -15,6 +15,7 @@ interface ServerSettings {
   hospitalPortalActive: boolean; 
   messAdvanceNoticeDays: number;
   medicalPastClaimDays: number;
+  semesterStartDate: Date | string | null;
   // ------------------------------------------------
   registrationOpen: boolean; maintenanceMode: boolean; maintenanceMessage: string;
   messRebateRateDaily: number; maxFestReimbursement: number; maxMedicalReimbursement: number;
@@ -34,6 +35,7 @@ const defaultSettings: ServerSettings = {
   hospitalPortalActive: true,
   messAdvanceNoticeDays: 3,
   medicalPastClaimDays: 30,
+  semesterStartDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
   // --------------------------------------
   registrationOpen: true, maintenanceMode: false,
   maintenanceMessage: 'System is under maintenance. Please check back shortly.',
@@ -241,11 +243,31 @@ export function PortalSettingsView() {
               <NumberInput label="Max Fest Reimbursement" value={settings.maxFestReimbursement} onChange={v => update('maxFestReimbursement', v)} prefix="₹" min={0} description="Upper cap per fest claim" />
               <NumberInput label="Max Medical Claim" value={settings.maxMedicalReimbursement} onChange={v => update('maxMedicalReimbursement', v)} prefix="₹" min={0} description="Upper cap per medical claim" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
               <NumberInput label="Max Claims / Month" value={settings.maxClaimsPerMonth} onChange={v => update('maxClaimsPerMonth', v)} suffix="claims" min={1} description="Per-student monthly limit" />
               <NumberInput label="Max File Upload" value={settings.maxFileUploadMB} onChange={v => update('maxFileUploadMB', v)} suffix="MB" min={1} max={100} description="Per-attachment size limit" />
               <NumberInput label="Mess Advance Notice" value={settings.messAdvanceNoticeDays} onChange={v => update('messAdvanceNoticeDays', v)} suffix="days" min={0} description="Days required before absence starts" />
               <NumberInput label="Medical Claim Window" value={settings.medicalPastClaimDays} onChange={v => update('medicalPastClaimDays', v)} suffix="days" min={1} description="Max past days allowed for treatment" />
+            </div>
+
+            <div className="mt-6 p-4 bg-slate-900/50 border border-slate-700/50 rounded-xl">
+              <label className="block text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1.5">
+                Semester Start Date (Mess Limit Reset)
+              </label>
+              <p className="text-slate-500 text-xs mb-3 leading-relaxed">
+                All mess rebates submitted <strong>on or after this date</strong> will count towards a student's {settings.maxMessRebateDays}-day limit. Change this date to instantly reset everyone's limit to 0 for the new semester.
+              </p>
+              <input
+                type="date"
+                value={
+                  settings.semesterStartDate 
+                    ? new Date(settings.semesterStartDate).toISOString().split('T')[0] 
+                    : ''
+                }
+                onChange={(e) => update('semesterStartDate', e.target.value)}
+                className="w-full sm:w-1/2 px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-colors"
+              />
             </div>
           </SectionCard>
 

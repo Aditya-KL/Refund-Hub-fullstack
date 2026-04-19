@@ -82,6 +82,12 @@ interface AdminClaim {
   };
 }
 
+interface AdminToastState {
+  type: 'success' | 'error';
+  title: string;
+  message: string;
+}
+
 // ─── Static / Chart Data ──────────────────────────────────────────────────────
 const mockAuditLogs: AuditLog[] = [
   { _id: 'a1', secretaryId: '1', secretaryName: 'Dr. Rajesh Kumar', action: 'APPROVE_CLAIM', targetCollection: 'claims', targetId: 'CLM-1041', details: 'Approved mess rebate claim for student Arjun Mehta (Roll: 21BCS045)', ipAddress: '192.168.1.12', timestamp: '2025-03-27T10:32:00Z', status: 'success' },
@@ -741,6 +747,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   const [portalActive, setPortalActive] = useState(true);
   const [showManageModal, setShowManageModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [adminToast, setAdminToast] = useState<AdminToastState | null>(null);
 
   // Overview table: live secretaries from DB
   const [secretaries, setSecretaries] = useState<Secretary[]>([]);
@@ -794,6 +801,12 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     fetchOverviewClaims();
   }, []);
 
+  useEffect(() => {
+    if (!adminToast) return;
+    const timeout = window.setTimeout(() => setAdminToast(null), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [adminToast]);
+
   // ─── Heartbeat: Update user's lastLogin every 30 seconds while on this page ────
   useEffect(() => {
     if (!storedUser?._id) return;
@@ -842,7 +855,11 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   const handlePushApprovedClaims = async () => {
     if (!storedUser?._id) {
-      window.alert('Admin user session not found. Please log in again.');
+      setAdminToast({
+        type: 'error',
+        title: 'Session missing',
+        message: 'Admin user session not found. Please log in again.',
+      });
       return;
     }
 
@@ -859,11 +876,19 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'Failed to push claims to accounts');
-      window.alert(result.message || 'Claims pushed to accounts.');
+      setAdminToast({
+        type: 'success',
+        title: 'Pushed to Accounts',
+        message: result.message || 'Claims were successfully pushed to the accounts queue.',
+      });
       await fetchOverviewClaims();
     } catch (error: any) {
       console.error('Push claims error:', error);
-      window.alert(error.message || 'Failed to push claims to accounts.');
+      setAdminToast({
+        type: 'error',
+        title: 'Push failed',
+        message: error.message || 'Failed to push claims to accounts.',
+      });
     } finally {
       setAdminActionLoading(null);
     }
@@ -996,6 +1021,53 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   return (
     <div className="flex h-screen bg-slate-900 overflow-hidden">
+      {adminToast && (
+        <div className="fixed top-4 right-4 z-[70] w-[min(92vw,24rem)]">
+          <div
+            className={`relative overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 animate-[toast-in_0.28s_ease-out] ${
+              adminToast.type === 'success'
+                ? 'border-emerald-400/30 bg-slate-900/95 text-white shadow-emerald-950/40'
+                : 'border-rose-400/30 bg-slate-900/95 text-white shadow-rose-950/40'
+            }`}
+          >
+            <div
+              className={`absolute inset-x-0 top-0 h-1 ${
+                adminToast.type === 'success' ? 'bg-emerald-400' : 'bg-rose-400'
+              }`}
+            />
+            <div className="flex items-start gap-3 p-4 pr-12">
+              <div
+                className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
+                  adminToast.type === 'success'
+                    ? 'border-emerald-400/30 bg-emerald-400/15 text-emerald-300'
+                    : 'border-rose-400/30 bg-rose-400/15 text-rose-300'
+                }`}
+              >
+                {adminToast.type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold tracking-tight">{adminToast.title}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-300">{adminToast.message}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminToast(null)}
+              className="absolute right-3 top-3 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Dismiss notification"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes toast-in {
+          0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-slate-800 border-r border-slate-700 flex-shrink-0">

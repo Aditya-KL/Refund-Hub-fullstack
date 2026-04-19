@@ -345,7 +345,10 @@ export function SecretaryLayout({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+        <div
+          className="flex-1 overflow-y-auto pb-20 lg:pb-0"
+          style={{ scrollbarGutter: 'stable' }}
+        >
           {children}
         </div>
 <nav

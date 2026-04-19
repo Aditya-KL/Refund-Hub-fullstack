@@ -400,21 +400,28 @@ function ClaimsPage({
   secretary: SecretaryUser | null;
 }) {
   const [selected, setSelected] = useState<Claim | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'rejected'>('pending');
   const [search, setSearch] = useState('');
   const [actionError, setActionError] = useState('');
   const cfg = deptConfig[dept];
 
-  const filtered = claims.filter(c => {
-    const ms = search.toLowerCase();
-    const name = c.student?.fullName || c.studentName || '';
-    const roll = c.student?.studentId || c.studentRoll || '';
-    const ref  = c.claimRefId || c.claimId || '';
-    return (
-      (statusFilter === 'all' || c.status === statusFilter) &&
-      (name.toLowerCase().includes(ms) || roll.toLowerCase().includes(ms) || ref.toLowerCase().includes(ms))
-    );
-  });
+  const filtered = claims
+    .filter(c => c.status === 'pending')
+    .filter(c => {
+      const ms = search.toLowerCase();
+      const name = c.student?.fullName || c.studentName || '';
+      const roll = c.student?.studentId || c.studentRoll || '';
+      const ref  = c.claimRefId || c.claimId || '';
+      return (
+        name.toLowerCase().includes(ms) ||
+        roll.toLowerCase().includes(ms) ||
+        ref.toLowerCase().includes(ms)
+      );
+    })
+    .sort((a, b) => {
+      const aTime = new Date(a.submittedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.submittedAt || b.createdAt || 0).getTime();
+      return aTime - bTime;
+    });
 
   const handleVerify = async (id: string, remarks: string) => {
     if (!secretary) return;
@@ -488,15 +495,6 @@ function ClaimsPage({
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, roll no., ref ID..."
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
             style={{ '--tw-ring-color': cfg.accent } as any} />
-        </div>
-        <div className="flex gap-2 overflow-x-auto">
-          {(['all', 'pending', 'rejected'] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'}`}
-              style={statusFilter === s ? { background: cfg.accent } : {}}>
-              {s}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -634,11 +632,11 @@ function ApprovedHistoryPage({
 }) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'disbursed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'disbursed' | 'rejected'>('all');
   const [actionError, setActionError] = useState('');
   const cfg = deptConfig[dept];
 
-  const processedClaims = claims.filter(c => ['approved', 'disbursed', 'verified'].includes(c.status));
+  const processedClaims = claims.filter(c => ['approved', 'disbursed', 'rejected'].includes(c.status));
   const filtered = processedClaims.filter(c => {
     const ms = search.toLowerCase();
     const name = c.student?.fullName || c.studentName || '';
@@ -714,7 +712,7 @@ function ApprovedHistoryPage({
       </div>
 
       <div className="flex gap-2 overflow-x-auto">
-        {(['all', 'approved', 'disbursed'] as const).map(s => (
+        {(['all', 'approved', 'disbursed', 'rejected'] as const).map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
             className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'}`}
             style={statusFilter === s ? { background: cfg.accent } : {}}>
@@ -727,7 +725,7 @@ function ApprovedHistoryPage({
         {[
           { label: 'Approved', count: claims.filter(c => c.status === 'approved').length, color: 'bg-green-50 text-green-700 border-green-100' },
           { label: 'Disbursed', count: claims.filter(c => c.status === 'disbursed').length, color: 'bg-purple-50 text-purple-700 border-purple-100' },
-          { label: 'Total', count: processedClaims.length, color: 'bg-slate-50 text-slate-700 border-slate-100' },
+          { label: 'Rejected', count: claims.filter(c => c.status === 'rejected').length, color: 'bg-red-50 text-red-700 border-red-100' },
         ].map(s => (
           <div key={s.label} className={`rounded-xl p-3 border text-center ${s.color}`}>
             <p className="text-xl font-black">{s.count}</p>
@@ -806,7 +804,15 @@ function ApprovedHistoryPage({
 
           {/* ── Desktop table ── */}
           <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[24%]" />
+                <col className="w-[14%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+                <col className="w-[10%]" />
+              </colgroup>
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Ref ID', 'Student', 'Amount', 'Status', 'Remarks', 'Action'].map(h => (
@@ -825,10 +831,14 @@ function ApprovedHistoryPage({
                         <p className="font-semibold text-slate-700 text-sm">{name}</p>
                         <p className="text-xs text-slate-400">{roll}</p>
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-bold" style={{ color: cfg.accent }}>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-bold text-right" style={{ color: cfg.accent }}>
                         ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
                       </td>
-                      <td className="px-4 py-3.5"><StatusBadge status={claim.status} /></td>
+                      <td className="px-4 py-3.5">
+                        <div className="w-full overflow-hidden">
+                          <StatusBadge status={claim.status} />
+                        </div>
+                      </td>
                       <td className="px-4 py-3.5 max-w-[180px]">
                         <p className="text-xs text-slate-500 truncate">
                           {claim.verifierRemarks || claim.approverRemarks || claim.rejectionReason || '—'}

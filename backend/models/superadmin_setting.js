@@ -77,6 +77,7 @@ const ServerSettingsSchema = new mongoose.Schema({
   dbBackupFrequencyHours:  { type: Number, default: 24, min: 1, max: 168 },
   logRetentionDays:        { type: Number, default: 365, min: 30 },
   rateLimitRequestsPerMin: { type: Number, default: 100, min: 10 },
+  semesterStartDate: { type: Date, default: Date.now },
   lastUpdatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
 
