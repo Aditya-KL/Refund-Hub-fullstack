@@ -175,12 +175,17 @@ async function getFestClaimsForActor(req, res) {
 
       for (const claim of claims) {
         const claimCommittee = normalizeCommittee(claim.committeeName);
+        const hasCoordinatorVerification = Array.isArray(claim.verifications)
+          && claim.verifications.some((v) => v?.stage === 'COORDINATOR');
         if (
           position === 'COORDINATOR' &&
           actorCommittee &&
           claimCommittee &&
           claimCommittee !== actorCommittee
         ) continue;
+        if (position === 'FEST_COORDINATOR' && hasCoordinatorVerification && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)) {
+          continue;
+        }
         if (String(claim.student?._id) === String(actorId)) continue;
 
         results.push({
@@ -322,6 +327,12 @@ async function verifyFestClaimByFC(req, res) {
 
     if (!['COORDINATOR', 'SUB_COORDINATOR'].includes(claimMembership.position))
       return res.status(403).json({ message: 'Fest Coordinators can only verify coordinator or sub-coordinator claims in the same fest.' });
+
+    const hasCoordinatorVerification = Array.isArray(claim.verifications)
+      && claim.verifications.some((v) => v?.stage === 'COORDINATOR');
+    if (hasCoordinatorVerification) {
+      return res.status(400).json({ message: 'This claim is already coordinator-verified and has been forwarded for Fest Secretary approval.' });
+    }
 
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,

@@ -243,13 +243,15 @@ function ClaimCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const actorPosition = claim.actorPosition || currentUserPosition;
+  const hasCoordinatorVerification = (claim.verifications || []).some(v => v.stage === 'COORDINATOR');
 
   const canVerify = (() => {
-    if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_FEST'].includes(claim.status)) return false;
+    if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_COORD', 'VERIFIED_FEST'].includes(claim.status)) return false;
     if (actorPosition === 'COORDINATOR') {
       return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
     }
     if (actorPosition === 'FEST_COORDINATOR') {
+      if (hasCoordinatorVerification) return false;
       return (
         ['COORDINATOR', 'SUB_COORDINATOR'].includes(claim.claimantPosition) &&
         ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)
@@ -401,6 +403,7 @@ export function VerifyReimbursementView({
   const [filterRole, setFilterRole] = useState<Position | 'ALL'>('ALL');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [festDropdownOpen, setFestDropdownOpen] = useState(false);
 
   // Modals
   const [verifyTarget, setVerifyTarget] = useState<FestClaim | null>(null);
@@ -533,6 +536,7 @@ export function VerifyReimbursementView({
   const availableRoleFilters: (Position | 'ALL')[] = currentUserPosition === 'FEST_COORDINATOR'
     ? ['ALL', 'COORDINATOR', 'SUB_COORDINATOR']
     : ['SUB_COORDINATOR'];
+  const selectedFest = userFests.find(f => f._id === selectedFestId) || userFests[0] || null;
 
   // Group claims by fest
   const festGroups = displayed.reduce((acc, c) => {
@@ -560,7 +564,6 @@ export function VerifyReimbursementView({
           onCancel={() => setRejectTargetId(null)}
         />
       )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -570,16 +573,47 @@ export function VerifyReimbursementView({
             {' '}· {userFests.map(f => f.festName).join(', ')}
           </p>
         </div>
-        <button
-          onClick={fetchClaims}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 shadow-sm transition-colors disabled:opacity-60"
-        >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
-          Refresh
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {userFests.length > 1 && (
+            <div className="relative">
+              <button
+                onClick={() => setFestDropdownOpen(v => !v)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors max-w-xs sm:max-w-none"
+              >
+                <span className="truncate">{selectedFest?.festName || 'Select Fest'}</span>
+                <ChevronDown size={10} className={`transition-transform shrink-0 ${festDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {festDropdownOpen && (
+                <div className="absolute left-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[220px] overflow-hidden">
+                  {userFests.map((f, idx) => (
+                    <button
+                      key={f._id}
+                      onClick={() => { setSelectedFestId(f._id); setFestDropdownOpen(false); }}
+                      className={`w-full text-center px-4 py-3 text-sm transition-colors ${selectedFest?._id === f._id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      <span className="inline-flex items-center gap-2 justify-center">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${selectedFest?._id === f._id ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {idx + 1}
+                        </span>
+                        <span>{f.festName}</span>
+                      </span>
+                      <span className="text-xs text-gray-400 block mt-0.5">{f.academicYear}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={fetchClaims}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 shadow-sm transition-colors disabled:opacity-60"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
+            Refresh
+          </button>
+        </div>
       </div>
-
       {/* Info banner for FC */}
       {currentUserPosition === 'FEST_COORDINATOR' && (
         <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
@@ -596,7 +630,7 @@ export function VerifyReimbursementView({
           <Info size={15} className="text-violet-600 shrink-0 mt-0.5" />
           <p className="text-xs text-violet-700">
             <span className="font-semibold">As Coordinator</span>, you can verify Sub-Coordinator claims.
-            Fest Coordinator can also verify the same pending claims directly.
+            Once you verify, the claim moves directly to Fest Secretary approval.
           </p>
         </div>
       )}
@@ -614,24 +648,6 @@ export function VerifyReimbursementView({
           </div>
         ))}
       </div>
-
-      {userFests.length > 1 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-4">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Fest Scope</label>
-          <select
-            value={selectedFestId}
-            onChange={e => setSelectedFestId(e.target.value)}
-            className="w-full sm:w-auto min-w-[240px] px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-          >
-            {userFests.map(f => (
-              <option key={f._id} value={f._id}>
-                {f.festName} ({f.academicYear})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Search & Filters */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4 shadow-sm">
         
@@ -724,3 +740,4 @@ export function VerifyReimbursementView({
 }
 
 export default VerifyReimbursementView;
+
