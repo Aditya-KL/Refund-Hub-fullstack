@@ -184,7 +184,13 @@ export function SelectCategoryModal({
 }: SelectCategoryModalProps) {
   const [selected, setSelected] = useState<string | null>(null);
   const [portalError, setPortalError] = useState<string | null>(null);
-
+  
+  useEffect(() => {
+    if (portalError) {
+      const timer = setTimeout(() => setPortalError(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [portalError]);
   if (!isOpen) return null;
 
   // Portal / maintenance guard
@@ -265,6 +271,20 @@ export function SelectCategoryModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSelected(null); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+
+        {portalError && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-8 duration-300">
+          <div className="flex items-center gap-3 px-5 py-3 bg-gray-900 border border-gray-800 shadow-2xl shadow-red-500/20 rounded-full w-max max-w-[90vw]">
+            <div className="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+              <AlertTriangle size={14} className="text-red-400" />
+            </div>
+            <p className="text-sm font-medium text-white tracking-wide pr-2">
+              {portalError}
+            </p>
+          </div>
+        </div>
+      )}
+
         {/* Header */}
         <div className="px-6 pt-6 pb-5 border-b border-gray-100">
           <div className="flex items-start justify-between">
@@ -327,14 +347,14 @@ export function SelectCategoryModal({
           )}
         </div>
 
-        {portalError && (
+        {/* {portalError && (
           <div className="px-5 pb-2">
             <div className="flex items-center gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-bottom-2">
               <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
               <p className="text-sm font-semibold text-red-800">{portalError}</p>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Footer */}
         <div className="px-5 pb-5 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
@@ -346,17 +366,21 @@ export function SelectCategoryModal({
           <button 
             onClick={() => { 
               if (selected) { 
-                // --- NEW PORTAL CHECKS WITH UI ERROR ---
+                // --- CHECK PORTAL SETTINGS BEFORE CONTINUING ---
                 if (selected === 'mess-rebate' && !settings.messPortalActive) {
-                  return setPortalError('The Mess Claims portal is currently disabled.');
+                  setPortalError('The Mess Claims portal is currently disabled.');
+                  return;
                 }
                 if (selected === 'fest-activity' && !settings.festPortalActive) {
-                  return setPortalError('The Fest Reimbursements portal is currently disabled.');
+                  setPortalError('The Fest Reimbursements portal is currently disabled.');
+                  return;
                 }
                 if (selected === 'medical-rebate' && !settings.hospitalPortalActive) {
-                  return setPortalError('The Medical Claims portal is currently disabled.');
+                  setPortalError('The Medical Claims portal is currently disabled.');
+                  return;
                 }
                 
+                // If everything is open, proceed!
                 onNext(selected); 
                 setSelected(null); 
                 setPortalError(null);

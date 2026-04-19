@@ -536,7 +536,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                       You haven't submitted any claims yet.
                     </div>
                   ) : (
-                    dashboardClaims.slice(0, 3).map((claim) => (
+                    dashboardClaims.slice(0, 4).map((claim) => (
                       <ClaimStatusCard key={claim.id} claim={claim} onClick={() => setActiveMenuItem('claims')} />
                     ))
                   )}
