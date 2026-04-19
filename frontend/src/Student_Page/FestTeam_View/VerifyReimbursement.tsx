@@ -263,7 +263,7 @@ function ClaimCard({
   const canReject = !['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'].includes(claim.status);
 
   return (
-    <div className={`bg-white border rounded-2xl overflow-hidden transition-all ${loading ? 'opacity-60 pointer-events-none' : 'hover:border-gray-200 hover:shadow-sm'} border-gray-100`}>
+    <div className={`bg-white border rounded-2xl overflow-hidden transition-all h-full ${loading ? 'opacity-60 pointer-events-none' : 'hover:border-gray-200 hover:shadow-sm'} border-gray-100`}>
       <div className="p-4">
         <div className="flex items-start gap-3">
           {/* Avatar */}
@@ -284,7 +284,7 @@ function ClaimCard({
             </p>
           </div>
 
-          <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
             <p className="text-base font-bold text-gray-900">₹{claim.amount.toLocaleString()}</p>
             <StatusBadge status={claim.status} />
           </div>
@@ -335,21 +335,21 @@ function ClaimCard({
         )}
 
         {/* Footer row */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between mt-3 pt-3 border-t border-gray-50">
           <button
             onClick={() => setExpanded(v => !v)}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors"
+            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors w-fit"
           >
             <FileText size={12} />
             {claim.attachments.length} attachment{claim.attachments.length !== 1 ? 's' : ''}
             <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
             {canReject && (
               <button
                 onClick={() => onReject(claim._id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
               >
                 <XCircle size={13} /> Reject
               </button>
@@ -357,7 +357,7 @@ function ClaimCard({
             {canVerify && (
               <button
                 onClick={() => onVerify(claim)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+                className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
               >
                 <BadgeCheck size={13} /> Verify
               </button>
@@ -547,7 +547,7 @@ export function VerifyReimbursementView({
   }, {} as Record<string, FestClaim[]>);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:space-y-7">
       {/* Modals */}
       {verifyTarget && (
         <VerifyModal
@@ -565,7 +565,7 @@ export function VerifyReimbursementView({
         />
       )}
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Verify Reimbursements</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -573,18 +573,18 @@ export function VerifyReimbursementView({
             {' '}· {userFests.map(f => f.festName).join(', ')}
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
           {userFests.length > 1 && (
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <button
                 onClick={() => setFestDropdownOpen(v => !v)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors max-w-xs sm:max-w-none"
+                className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors max-w-xs sm:max-w-none"
               >
                 <span className="truncate">{selectedFest?.festName || 'Select Fest'}</span>
                 <ChevronDown size={10} className={`transition-transform shrink-0 ${festDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
               {festDropdownOpen && (
-                <div className="absolute left-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[220px] overflow-hidden">
+                <div className="absolute left-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[220px] w-full sm:w-auto overflow-hidden">
                   {userFests.map((f, idx) => (
                     <button
                       key={f._id}
@@ -607,7 +607,7 @@ export function VerifyReimbursementView({
           <button
             onClick={fetchClaims}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 shadow-sm transition-colors disabled:opacity-60"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 shadow-sm transition-colors disabled:opacity-60"
           >
             {loading ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
             Refresh
@@ -636,7 +636,7 @@ export function VerifyReimbursementView({
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Pending', value: pendingCount, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
           { label: 'Verified', value: verifiedCount, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
@@ -711,33 +711,123 @@ export function VerifyReimbursementView({
           <p className="text-xs text-gray-400 mt-1">Try changing the filters above</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(festGroups).map(([festName, festClaims]) => (
-            <div key={festName}>
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles size={14} className="text-amber-500" />
-                <h2 className="text-sm font-bold text-gray-700">{festName}</h2>
-                <span className="text-xs text-gray-400">({festClaims.length} claim{festClaims.length !== 1 ? 's' : ''})</span>
+        <>
+          {/* Mobile / Tablet cards */}
+          <div className="space-y-6 lg:hidden">
+            {Object.entries(festGroups).map(([festName, festClaims]) => (
+              <div key={festName}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles size={14} className="text-amber-500" />
+                  <h2 className="text-sm font-bold text-gray-700">{festName}</h2>
+                  <span className="text-xs text-gray-400">({festClaims.length} claim{festClaims.length !== 1 ? 's' : ''})</span>
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {festClaims.map(claim => (
+                    <ClaimCard
+                      key={claim._id}
+                      claim={claim}
+                      currentUserPosition={currentUserPosition}
+                      onVerify={setVerifyTarget}
+                      onReject={setRejectTargetId}
+                      loading={actionLoading === claim._id}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="space-y-3">
-                {festClaims.map(claim => (
-                  <ClaimCard
-                    key={claim._id}
-                    claim={claim}
-                    currentUserPosition={currentUserPosition}
-                    onVerify={setVerifyTarget}
-                    onReject={setRejectTargetId}
-                    loading={actionLoading === claim._id}
-                  />
-                ))}
-              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px]">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    {['Ref ID', 'Student', 'Committee', 'Role', 'Amount', 'Date', 'Status', 'Action'].map(h => (
+                      <th
+                        key={h}
+                        className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {displayed.map(claim => {
+                    const actorPosition = claim.actorPosition || currentUserPosition;
+                    const hasCoordinatorVerification = (claim.verifications || []).some(v => v.stage === 'COORDINATOR');
+                    const canVerify = (() => {
+                      if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_COORD', 'VERIFIED_FEST'].includes(claim.status)) return false;
+                      if (actorPosition === 'COORDINATOR') {
+                        return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
+                      }
+                      if (actorPosition === 'FEST_COORDINATOR') {
+                        if (hasCoordinatorVerification) return false;
+                        return (
+                          ['COORDINATOR', 'SUB_COORDINATOR'].includes(claim.claimantPosition) &&
+                          ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)
+                        );
+                      }
+                      return false;
+                    })();
+                    const canReject = !['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'].includes(claim.status);
+
+                    return (
+                      <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
+                        <td className="px-4 py-3.5">
+                          <p className="font-semibold text-slate-700 text-sm">{claim.student.fullName}</p>
+                          <p className="text-xs text-slate-400">{claim.student.studentId}</p>
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-slate-600 whitespace-nowrap">{claim.claimantCommittee || 'General'}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <RoleBadge role={claim.claimantPosition} />
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <span className="font-bold text-violet-700">Rs. {claim.amount.toLocaleString('en-IN')}</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">
+                          {new Date(claim.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <StatusBadge status={claim.status} />
+                        </td>
+                        <td className="px-4 py-3.5 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {canReject && (
+                              <button
+                                onClick={() => setRejectTargetId(claim._id)}
+                                disabled={actionLoading === claim._id}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-60"
+                              >
+                                <XCircle size={12} /> Reject
+                              </button>
+                            )}
+                            {canVerify && (
+                              <button
+                                onClick={() => setVerifyTarget(claim)}
+                                disabled={actionLoading === claim._id}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors disabled:opacity-60"
+                              >
+                                <BadgeCheck size={12} /> Verify
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
 export default VerifyReimbursementView;
+
 
