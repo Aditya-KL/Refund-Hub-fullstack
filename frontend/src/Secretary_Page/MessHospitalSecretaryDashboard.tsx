@@ -98,7 +98,7 @@ async function fetchClaimsFromAPI(dept: Department): Promise<Claim[]> {
   }));
 }
 
-// ─── Empty fallback user (no mock data) ───────────────────────────────────────
+// ─── Empty fallback user ───────────────────────────────────────────────────────
 function makeFallbackUser(dept: Department): SecretaryUser {
   return {
     _id: '',
@@ -365,18 +365,30 @@ function OverviewPage({ claims, dept }: { claims: Claim[]; dept: Department }) {
             ? <div className="py-10 text-center text-slate-400 text-sm">No claims yet</div>
             : recent.map(c => {
               const name = c.student?.fullName || c.studentName || '—';
+              const date = c.submittedAt ? new Date(c.submittedAt) : null;
               return (
-                <div key={c._id} className="flex items-center gap-4 px-5 py-3.5">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-700 truncate">{name}</p>
-                    <p className="text-xs text-slate-400">
-                      {c.claimRefId} · {c.submittedAt ? new Date(c.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                <div key={c._id} className="flex items-center gap-3 px-4 py-3.5">
+                  {/* Date pill */}
+                  <div className="flex-shrink-0 w-9 text-center">
+                    <p className="text-xs font-black text-slate-700 leading-tight">
+                      {date ? date.toLocaleDateString('en-IN', { day: '2-digit' }) : '—'}
+                    </p>
+                    <p className="text-xs text-slate-400 leading-tight">
+                      {date ? date.toLocaleDateString('en-IN', { month: 'short' }) : ''}
                     </p>
                   </div>
-                  <span className="font-bold text-slate-700 text-sm whitespace-nowrap">
-                    ₹{(c.effectiveAmount ?? c.amount).toLocaleString('en-IN')}
-                  </span>
-                  <StatusBadge status={c.status} />
+                  {/* Name + ref */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-700 truncate">{name}</p>
+                    <p className="text-xs text-slate-400 truncate font-mono">{c.claimRefId || c.claimId}</p>
+                  </div>
+                  {/* Amount + badge stacked */}
+                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                    <span className="text-sm font-black text-slate-800">
+                      ₹{(c.effectiveAmount ?? c.amount).toLocaleString('en-IN')}
+                    </span>
+                    <StatusBadge status={c.status} />
+                  </div>
                 </div>
               );
             })}
@@ -496,61 +508,110 @@ function ClaimsPage({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {filtered.length === 0
-          ? <div className="py-16 text-center text-slate-400"><p className="text-sm">No claims found</p></div>
-          : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    {['Ref ID', 'Student', ...(dept === 'mess' ? ['Days'] : []), 'Amount', 'Date', 'Status', 'Action'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filtered.map(claim => {
-                    const name = claim.student?.fullName || claim.studentName || '—';
-                    const roll = claim.student?.studentId || claim.studentRoll || '—';
-                    return (
-                      <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId || claim.claimId}</td>
-                        <td className="px-4 py-4">
-                          <p className="font-semibold text-slate-700 text-sm">{name}</p>
-                          <p className="text-xs text-slate-400">{roll}</p>
-                        </td>
-                        {dept === 'mess' && (
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-1 rounded-full">
-                              {claim.messAbsenceDays ?? '—'} days
-                            </span>
-                          </td>
-                        )}
+      {/* ── Mobile cards ── */}
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 text-center text-slate-400">
+          <p className="text-sm">No claims found</p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3 lg:hidden">
+            {filtered.map(claim => {
+              const name = claim.student?.fullName || claim.studentName || '—';
+              const roll = claim.student?.studentId || claim.studentRoll || '—';
+              return (
+                <div key={claim._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ background: cfg.accentLight, color: cfg.accentDark }}>
+                      {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800">{name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{roll}</p>
+                      <p className="text-xs font-mono text-slate-400 mt-0.5">{claim.claimRefId || claim.claimId}</p>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-base font-black" style={{ color: cfg.accent }}>
+                        ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {claim.submittedAt ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <StatusBadge status={claim.status} />
+                      {dept === 'mess' && claim.messAbsenceDays != null && (
+                        <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-1 rounded-full">
+                          {claim.messAbsenceDays} days
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => setSelected(claim)}
+                      className="flex items-center gap-1.5 px-3 py-2 text-white rounded-xl text-xs font-bold"
+                      style={{ background: cfg.accent }}>
+                      <Eye size={13} /> {claim.status === 'pending' ? 'Review' : 'View'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Desktop table ── */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  {['Ref ID', 'Student', ...(dept === 'mess' ? ['Days'] : []), 'Amount', 'Date', 'Status', 'Action'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(claim => {
+                  const name = claim.student?.fullName || claim.studentName || '—';
+                  const roll = claim.student?.studentId || claim.studentRoll || '—';
+                  return (
+                    <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId || claim.claimId}</td>
+                      <td className="px-4 py-4">
+                        <p className="font-semibold text-slate-700 text-sm">{name}</p>
+                        <p className="text-xs text-slate-400">{roll}</p>
+                      </td>
+                      {dept === 'mess' && (
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <span className="font-bold" style={{ color: cfg.accent }}>
-                            ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
+                          <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-1 rounded-full">
+                            {claim.messAbsenceDays ?? '—'} days
                           </span>
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-xs text-slate-400">
-                          {claim.submittedAt ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
-                        </td>
-                        <td className="px-4 py-4"><StatusBadge status={claim.status} /></td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <button onClick={() => setSelected(claim)}
-                            className="flex items-center gap-1.5 px-3 py-2 text-white rounded-xl text-xs font-bold transition-colors"
-                            style={{ background: cfg.accent }}>
-                            <Eye size={13} /> {claim.status === 'pending' ? 'Review' : 'View'}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-      </div>
+                      )}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="font-bold" style={{ color: cfg.accent }}>
+                          ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-xs text-slate-400">
+                        {claim.submittedAt ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                      </td>
+                      <td className="px-4 py-4"><StatusBadge status={claim.status} /></td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <button onClick={() => setSelected(claim)}
+                          className="flex items-center gap-1.5 px-3 py-2 text-white rounded-xl text-xs font-bold transition-colors"
+                          style={{ background: cfg.accent }}>
+                          <Eye size={13} /> {claim.status === 'pending' ? 'Review' : 'View'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {selected && (
         <ClaimReviewPanel
@@ -592,7 +653,6 @@ function VerifiedRebatesPage({
       (name.toLowerCase().includes(ms) || ref.toLowerCase().includes(ms));
   });
 
-  // ── APPROVE a verified claim
   const handleApprove = async (id: string) => {
     if (!secretary) return;
     setActionError('');
@@ -612,7 +672,6 @@ function VerifiedRebatesPage({
     }
   };
 
-  // ── REJECT from verified/approved stage
   const handleReject = async (id: string, reason: string, stage: string) => {
     if (!secretary) return;
     setActionError('');
@@ -637,7 +696,6 @@ function VerifiedRebatesPage({
     }
   };
 
-  // ── UNVERIFY — revert verified → pending
   const handleUnverify = async (id: string) => {
     setActionError('');
     const backendPending = toBackendStatus(dept, 'pending');
@@ -662,7 +720,6 @@ function VerifiedRebatesPage({
     }
   };
 
-  // ── UNAPPROVE — revert approved → verified
   const handleUnapprove = async (id: string) => {
     setActionError('');
     const backendVerified = toBackendStatus(dept, 'verified');
@@ -737,75 +794,137 @@ function VerifiedRebatesPage({
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {filtered.length === 0
-          ? <div className="py-16 text-center text-slate-400"><p className="text-sm">No claims found</p></div>
-          : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    {['Ref ID', 'Student', 'Amount', 'Status', 'Remarks', 'Action'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filtered.map(claim => {
-                    const name = claim.student?.fullName || claim.studentName || '—';
-                    const roll = claim.student?.studentId || claim.studentRoll || '—';
-                    return (
-                      <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId || claim.claimId}</td>
-                        <td className="px-4 py-3.5">
-                          <p className="font-semibold text-slate-700 text-sm">{name}</p>
-                          <p className="text-xs text-slate-400">{roll}</p>
-                        </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap font-bold" style={{ color: cfg.accent }}>
-                          ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-4 py-3.5"><StatusBadge status={claim.status} /></td>
-                        <td className="px-4 py-3.5 max-w-[180px]">
-                          <p className="text-xs text-slate-500 truncate">
-                            {claim.verifierRemarks || claim.approverRemarks || claim.rejectionReason || '—'}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => setSelected(claim)}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-white rounded-lg text-xs font-bold transition-colors"
-                              style={{ background: cfg.accent }}>
-                              {claim.status === 'verified'
-                                ? <><BadgeCheck size={12} /> Approve</>
-                                : <><Eye size={12} /> View</>
-                              }
-                            </button>
-                            {claim.status === 'verified' && (
-                              <button onClick={() => handleUnverify(claim._id)}
-                                className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                title="Revert to Pending">
-                                <RotateCcw size={14} />
-                              </button>
-                            )}
-                            {claim.status === 'approved' && (
-                              <button onClick={() => handleUnapprove(claim._id)}
-                                className="p-1.5 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                title="Revert to Verified">
-                                <RotateCcw size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 text-center text-slate-400">
+          <p className="text-sm">No claims found</p>
+        </div>
+      ) : (
+        <>
+          {/* ── Mobile cards ── */}
+          <div className="space-y-3 lg:hidden">
+            {filtered.map(claim => {
+              const name = claim.student?.fullName || claim.studentName || '—';
+              const roll = claim.student?.studentId || claim.studentRoll || '—';
+              const remarks = claim.verifierRemarks || claim.approverRemarks || claim.rejectionReason || '';
+              return (
+                <div key={claim._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ background: cfg.accentLight, color: cfg.accentDark }}>
+                      {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800">{name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{roll}</p>
+                      <p className="text-xs font-mono text-slate-400 mt-0.5">{claim.claimRefId || claim.claimId}</p>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-base font-black" style={{ color: cfg.accent }}>
+                        ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  </div>
+                  {remarks && (
+                    <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 italic">
+                      {remarks}
+                    </p>
+                  )}
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                    <StatusBadge status={claim.status} />
+                    <div className="flex items-center gap-2">
+                      {claim.status === 'verified' && (
+                        <button onClick={() => handleUnverify(claim._id)}
+                          className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"
+                          title="Revert to Pending">
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
+                      {claim.status === 'approved' && (
+                        <button onClick={() => handleUnapprove(claim._id)}
+                          className="p-1.5 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+                          title="Revert to Verified">
+                          <RotateCcw size={14} />
+                        </button>
+                      )}
+                      <button onClick={() => setSelected(claim)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-white rounded-xl text-xs font-bold"
+                        style={{ background: cfg.accent }}>
+                        {claim.status === 'verified'
+                          ? <><BadgeCheck size={12} /> Approve</>
+                          : <><Eye size={12} /> View</>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-      {/* ── FIXED: onApprove now passed so Approve button appears in panel ── */}
+          {/* ── Desktop table ── */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  {['Ref ID', 'Student', 'Amount', 'Status', 'Remarks', 'Action'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(claim => {
+                  const name = claim.student?.fullName || claim.studentName || '—';
+                  const roll = claim.student?.studentId || claim.studentRoll || '—';
+                  return (
+                    <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId || claim.claimId}</td>
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-slate-700 text-sm">{name}</p>
+                        <p className="text-xs text-slate-400">{roll}</p>
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-bold" style={{ color: cfg.accent }}>
+                        ₹{(claim.effectiveAmount ?? claim.amount).toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3.5"><StatusBadge status={claim.status} /></td>
+                      <td className="px-4 py-3.5 max-w-[180px]">
+                        <p className="text-xs text-slate-500 truncate">
+                          {claim.verifierRemarks || claim.approverRemarks || claim.rejectionReason || '—'}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => setSelected(claim)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-white rounded-lg text-xs font-bold transition-colors"
+                            style={{ background: cfg.accent }}>
+                            {claim.status === 'verified'
+                              ? <><BadgeCheck size={12} /> Approve</>
+                              : <><Eye size={12} /> View</>
+                            }
+                          </button>
+                          {claim.status === 'verified' && (
+                            <button onClick={() => handleUnverify(claim._id)}
+                              className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              title="Revert to Pending">
+                              <RotateCcw size={14} />
+                            </button>
+                          )}
+                          {claim.status === 'approved' && (
+                            <button onClick={() => handleUnapprove(claim._id)}
+                              className="p-1.5 text-orange-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                              title="Revert to Verified">
+                              <RotateCcw size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
       {selected && (
         <ClaimReviewPanel
           claim={selected}
@@ -838,7 +957,6 @@ function SecretaryDashboardShell({
   const [claimsLoading, setClaimsLoading] = useState(true);
   const [claimsError, setClaimsError] = useState('');
 
-  // Load user from localStorage — no hardcoded fallback data
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (stored) {
@@ -883,10 +1001,8 @@ function SecretaryDashboardShell({
     load();
   }, [department]);
 
-  // ─── Heartbeat: Update secretary's lastLogin every 30 seconds ────────────────
   useEffect(() => {
     if (!user?._id) return;
-
     const sendHeartbeat = async () => {
       try {
         await fetch(`${BASE}/api/heartbeat/${user._id}`, { method: 'POST' });
@@ -894,9 +1010,8 @@ function SecretaryDashboardShell({
         console.error('Heartbeat error:', error);
       }
     };
-
-    sendHeartbeat(); // Send immediately on mount
-    const interval = setInterval(sendHeartbeat, 30000); // Then every 30 seconds
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 30000);
     return () => clearInterval(interval);
   }, [user?._id]);
 
@@ -972,8 +1087,8 @@ export function HospitalSecretaryDashboard({ onLogout }: { onLogout: () => void 
       department="hospital"
       onLogout={onLogout}
       navItems={[
-        { id: 'overview', label: 'Overview',       icon: Home },
-        { id: 'claims',   label: 'Medical Claims', icon: ClipboardList },
+        { id: 'overview', label: 'Overview',        icon: Home },
+        { id: 'claims',   label: 'Medical Claims',  icon: ClipboardList },
         { id: 'verified', label: 'Verified Claims', icon: Archive },
         { id: 'profile',  label: 'Profile',         icon: User },
       ]}
