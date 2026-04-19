@@ -41,10 +41,11 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
     fetchClaims();
   }, []);
 
-  const getTrackingDetails = (status: string) => {
-    if (status === 'REJECTED') return { step: 1, text: 'Rejected', subtext: 'Please contact admin', isError: true };
+  const getTrackingDetails = (claim: any) => {
+    const status = claim.status;
+    if (status === 'REJECTED') return { step: 1, text: 'Rejected', subtext: claim.rejectionReason || 'Please resubmit after fixing the issue', isError: true };
     if (status === 'REFUNDED') return { step: 4, text: 'Refunded', subtext: 'Funds released to bank', isError: false };
-    if (status === 'UNDER_PROCESS') return { step: 3, text: 'Approved', subtext: 'Queued with Accounts', isError: false };
+    if (status === 'UNDER_PROCESS') return { step: 3, text: 'Approved', subtext: claim.accountsBatchStatus === 'ON_HOLD' ? 'On hold with Accounts' : 'Queued with Accounts', isError: false };
     if (status === 'PUSHED_TO_ACCOUNTS') return { step: 3, text: 'Approved', subtext: 'Queued with Accounts', isError: false };
     if (status === 'APPROVED') return { step: 3, text: 'Approved', subtext: 'Awaiting final transfer', isError: false };
     if (status === 'VERIFIED_FEST' || status === 'VERIFIED_MESS' || status === 'VERIFIED_MEDICAL') {
@@ -183,7 +184,7 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {filteredClaims.map((claim) => {
-          const tracking = getTrackingDetails(claim.status);
+          const tracking = getTrackingDetails(claim);
           const isFest = claim.requestType === 'FEST_REIMBURSEMENT';
           const isMess = claim.requestType === 'MESS_REBATE';
           const messRange = formatDateRange(claim.messAbsenceFrom, claim.messAbsenceTo);
@@ -377,6 +378,13 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
                   Your {viewingClaimDetails.requestType === 'FEST_REIMBURSEMENT' ? 'fest reimbursement' : viewingClaimDetails.requestType === 'MESS_REBATE' ? 'mess rebate' : 'medical rebate'} claim has been submitted for verification.
                 </p>
               </div>
+
+              {viewingClaimDetails.status === 'REJECTED' && viewingClaimDetails.rejectionReason && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                  <p className="text-sm font-semibold text-red-700 mb-2">Resubmit After Fixing This</p>
+                  <p className="text-sm text-red-800">{viewingClaimDetails.rejectionReason}</p>
+                </div>
+              )}
 
               {/* Claim Information */}
               <div className="space-y-4">

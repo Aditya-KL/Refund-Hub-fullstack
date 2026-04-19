@@ -1439,4 +1439,3 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     </div>
   );
 }
-

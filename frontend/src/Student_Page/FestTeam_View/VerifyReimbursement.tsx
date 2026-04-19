@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-  XCircle, ChevronDown, Filter, Loader2,
-  ArrowUpRight, FileText, Crown, Shield, User, Search,
-  AlertTriangle, SortAsc, Info, Sparkles, BadgeCheck
+  CheckCircle2, XCircle, ChevronDown, Filter, Loader2,
+  Clock, ArrowUpRight, FileText, Crown, Shield, User, Search,
+  AlertTriangle, Send, SortAsc, Info, Sparkles, BadgeCheck
 } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
@@ -81,11 +81,11 @@ const ROLE_CONFIG: Record<Position, { label: string; color: string; bg: string; 
 };
 
 const STATUS_CONFIG: Record<ClaimStatus, { label: string; color: string; bg: string; border: string; dot: string }> = {
-  PENDING_TEAM_COORD:  { label: 'Pending',                  color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
-  PENDING_COORD:       { label: 'Pending',                  color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
-  PENDING_FC:          { label: 'Pending',                  color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200', dot: 'bg-violet-400' },
-  VERIFIED_COORD:      { label: 'Verified',                 color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   dot: 'bg-blue-400'   },
-  VERIFIED_FEST:       { label: 'Verified',                 color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  dot: 'bg-green-500'  },
+  PENDING_TEAM_COORD:  { label: 'Pending (Team Lead)',      color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
+  PENDING_COORD:       { label: 'Pending (Coordinator)',    color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
+  PENDING_FC:          { label: 'Pending (Fest Coord)',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200', dot: 'bg-violet-400' },
+  VERIFIED_COORD:      { label: 'Verified by Coordinator',  color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   dot: 'bg-blue-400'   },
+  VERIFIED_FEST:       { label: 'Verified by FC',           color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  dot: 'bg-green-500'  },
   APPROVED:            { label: 'Approved',                 color: 'text-green-800',  bg: 'bg-green-100',  border: 'border-green-300',  dot: 'bg-green-600'  },
   REJECTED:            { label: 'Rejected',                 color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',    dot: 'bg-red-500'    },
   REFUNDED:            { label: 'Refunded',                 color: 'text-purple-700', bg: 'bg-purple-50',  border: 'border-purple-200', dot: 'bg-purple-500' },
@@ -242,19 +242,24 @@ function ClaimCard({
   loading: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const actorPosition = claim.actorPosition || currentUserPosition;
-  const hasCoordinatorVerification = (claim.verifications || []).some(v => v.stage === 'COORDINATOR');
 
+  /**
+   * Verification eligibility:
+   * COORDINATOR → can verify SUB_COORDINATOR claims in PENDING_COORD
+   * FEST_COORDINATOR → can verify:
+   *   - COORDINATOR claims in PENDING_COORD (skip coord stage)
+   *   - Any claim in PENDING_FC (after coord verified sub-coord)
+   * Anyone can reject if claim is not already terminal
+   */
   const canVerify = (() => {
-    if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_COORD', 'VERIFIED_FEST'].includes(claim.status)) return false;
-    if (actorPosition === 'COORDINATOR') {
-      return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
+    if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_FEST'].includes(claim.status)) return false;
+    if (currentUserPosition === 'COORDINATOR') {
+      return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
     }
-    if (actorPosition === 'FEST_COORDINATOR') {
-      if (hasCoordinatorVerification) return false;
+    if (currentUserPosition === 'FEST_COORDINATOR') {
       return (
-        ['COORDINATOR', 'SUB_COORDINATOR'].includes(claim.claimantPosition) &&
-        ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)
+        (claim.claimantPosition === 'COORDINATOR' && ['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status)) ||
+        claim.status === 'PENDING_FC'
       );
     }
     return false;
@@ -263,7 +268,7 @@ function ClaimCard({
   const canReject = !['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'].includes(claim.status);
 
   return (
-    <div className={`bg-white border rounded-2xl overflow-hidden transition-all h-full ${loading ? 'opacity-60 pointer-events-none' : 'hover:border-gray-200 hover:shadow-sm'} border-gray-100`}>
+    <div className={`bg-white border rounded-2xl overflow-hidden transition-all ${loading ? 'opacity-60 pointer-events-none' : 'hover:border-gray-200 hover:shadow-sm'} border-gray-100`}>
       <div className="p-4">
         <div className="flex items-start gap-3">
           {/* Avatar */}
@@ -284,17 +289,14 @@ function ClaimCard({
             </p>
           </div>
 
-          <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
+          <div className="flex flex-col items-end gap-2 shrink-0">
             <p className="text-base font-bold text-gray-900">₹{claim.amount.toLocaleString()}</p>
             <StatusBadge status={claim.status} />
           </div>
         </div>
 
         {/* Description */}
-        <p className="text-xs text-gray-600 mt-3 line-clamp-2 leading-relaxed">
-          <span className="font-semibold text-gray-700">Description: </span>
-          {claim.description}
-        </p>
+        <p className="text-xs text-gray-600 mt-3 line-clamp-2 leading-relaxed">{claim.description}</p>
 
         {/* Transaction ID if present */}
         {claim.transactionId && (
@@ -335,21 +337,21 @@ function ClaimCard({
         )}
 
         {/* Footer row */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between mt-3 pt-3 border-t border-gray-50">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
           <button
             onClick={() => setExpanded(v => !v)}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors w-fit"
+            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors"
           >
             <FileText size={12} />
             {claim.attachments.length} attachment{claim.attachments.length !== 1 ? 's' : ''}
             <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </button>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
+          <div className="flex items-center gap-2">
             {canReject && (
               <button
                 onClick={() => onReject(claim._id)}
-                className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
               >
                 <XCircle size={13} /> Reject
               </button>
@@ -357,7 +359,7 @@ function ClaimCard({
             {canVerify && (
               <button
                 onClick={() => onVerify(claim)}
-                className="flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors"
               >
                 <BadgeCheck size={13} /> Verify
               </button>
@@ -398,12 +400,12 @@ export function VerifyReimbursementView({
 }: VerifyReimbursementViewProps) {
   const [claims, setClaims] = useState<FestClaim[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedFestId, setSelectedFestId] = useState<string>('');
+  const [selectedFestId, setSelectedFestId] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'role'>('date');
   const [filterRole, setFilterRole] = useState<Position | 'ALL'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<ClaimStatus | 'ALL'>('ALL');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [festDropdownOpen, setFestDropdownOpen] = useState(false);
 
   // Modals
   const [verifyTarget, setVerifyTarget] = useState<FestClaim | null>(null);
@@ -420,11 +422,8 @@ export function VerifyReimbursementView({
   };
 
   useEffect(() => {
-    if (!userFests.length) return;
-    if (!selectedFestId || !userFests.some(f => f._id === selectedFestId)) {
-      setSelectedFestId(userFests[0]._id);
-    }
-  }, [userFests, selectedFestId]);
+    if (userFests.length === 1) setSelectedFestId(userFests[0]._id);
+  }, [userFests]);
 
   useEffect(() => { fetchClaims(); }, [currentUserId]);
 
@@ -433,7 +432,7 @@ export function VerifyReimbursementView({
     setVerifyTarget(null);
     setActionLoading(claim._id);
     try {
-      const isFC = (claim.actorPosition || currentUserPosition) === 'FEST_COORDINATOR';
+      const isFC = currentUserPosition === 'FEST_COORDINATOR';
       const endpoint = isFC
         ? `/api/verify/fest/claims/${claim._id}/verify-fc`
         : `/api/verify/fest/claims/${claim._id}/verify-coord`;
@@ -447,18 +446,13 @@ export function VerifyReimbursementView({
           remarks,
         }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || 'Failed to verify claim.');
+      if (res.ok) {
+        const { claim: updated } = await res.json();
+        setClaims(prev => prev.map(c => c._id === updated._id
+          ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee, festName: c.festName }
+          : c
+        ));
       }
-
-      const { claim: updated } = await res.json();
-      setClaims(prev => prev.map(c => c._id === updated._id
-        ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee, festName: c.festName, actorPosition: c.actorPosition }
-        : c
-      ));
-    } catch (err: any) {
-      alert(err?.message || 'Failed to verify claim.');
     } finally {
       setActionLoading(null);
     }
@@ -469,7 +463,6 @@ export function VerifyReimbursementView({
     setRejectTargetId(null);
     setActionLoading(claimId);
     try {
-      const claim = claims.find(c => c._id === claimId);
       const res = await fetch(`${BASE_URL}/api/verify/claims/${claimId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -477,13 +470,13 @@ export function VerifyReimbursementView({
           rejectedBy: currentUserId,
           rejectedByName: currentUserName,
           rejectionReason: reason,
-          stage: claim?.actorPosition || currentUserPosition,
+          stage: currentUserPosition,
         }),
       });
       if (res.ok) {
         const { claim: updated } = await res.json();
         setClaims(prev => prev.map(c => c._id === updated._id
-          ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee, festName: c.festName, actorPosition: c.actorPosition }
+          ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee }
           : c
         ));
       }
@@ -493,12 +486,10 @@ export function VerifyReimbursementView({
   };
 
   // ── Filtering & Sorting ──
-  const pendingStatuses: ClaimStatus[] = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'];
-
   let displayed = claims
-    .filter(c => pendingStatuses.includes(c.status))
-    .filter(c => selectedFestId ? c.festId === selectedFestId : false)
-    .filter(c => filterRole === 'ALL' || c.claimantPosition === filterRole);
+    .filter(c => selectedFestId === 'ALL' || c.festId === selectedFestId)
+    .filter(c => filterRole === 'ALL' || c.claimantPosition === filterRole)
+    .filter(c => filterStatus === 'ALL' || c.status === filterStatus);
 
   // Coordinators only see sub-coordinator claims
   if (currentUserPosition === 'COORDINATOR') {
@@ -520,7 +511,7 @@ export function VerifyReimbursementView({
     const order: Record<Position, number> = { FEST_COORDINATOR: 0, COORDINATOR: 1, SUB_COORDINATOR: 2 };
     displayed = [...displayed].sort((a, b) => order[a.claimantPosition] - order[b.claimantPosition]);
   } else {
-    displayed = [...displayed].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    displayed = [...displayed].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   const pendingCount = claims.filter(c =>
@@ -536,7 +527,6 @@ export function VerifyReimbursementView({
   const availableRoleFilters: (Position | 'ALL')[] = currentUserPosition === 'FEST_COORDINATOR'
     ? ['ALL', 'COORDINATOR', 'SUB_COORDINATOR']
     : ['SUB_COORDINATOR'];
-  const selectedFest = userFests.find(f => f._id === selectedFestId) || userFests[0] || null;
 
   // Group claims by fest
   const festGroups = displayed.reduce((acc, c) => {
@@ -547,12 +537,12 @@ export function VerifyReimbursementView({
   }, {} as Record<string, FestClaim[]>);
 
   return (
-    <div className="space-y-6 lg:space-y-7">
+    <div className="space-y-6">
       {/* Modals */}
       {verifyTarget && (
         <VerifyModal
           claim={verifyTarget}
-          actorPosition={verifyTarget.actorPosition || currentUserPosition}
+          actorPosition={currentUserPosition}
           onConfirm={(id, remarks) => handleVerify(verifyTarget, remarks)}
           onCancel={() => setVerifyTarget(null)}
         />
@@ -564,8 +554,9 @@ export function VerifyReimbursementView({
           onCancel={() => setRejectTargetId(null)}
         />
       )}
+
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Verify Reimbursements</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -573,55 +564,24 @@ export function VerifyReimbursementView({
             {' '}· {userFests.map(f => f.festName).join(', ')}
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
-          {userFests.length > 1 && (
-            <div className="relative w-full sm:w-auto">
-              <button
-                onClick={() => setFestDropdownOpen(v => !v)}
-                className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-gray-300 shadow-sm transition-colors max-w-xs sm:max-w-none"
-              >
-                <span className="truncate">{selectedFest?.festName || 'Select Fest'}</span>
-                <ChevronDown size={10} className={`transition-transform shrink-0 ${festDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {festDropdownOpen && (
-                <div className="absolute left-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-10 min-w-[220px] w-full sm:w-auto overflow-hidden">
-                  {userFests.map((f, idx) => (
-                    <button
-                      key={f._id}
-                      onClick={() => { setSelectedFestId(f._id); setFestDropdownOpen(false); }}
-                      className={`w-full text-center px-4 py-3 text-sm transition-colors ${selectedFest?._id === f._id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      <span className="inline-flex items-center gap-2 justify-center">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${selectedFest?._id === f._id ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {idx + 1}
-                        </span>
-                        <span>{f.festName}</span>
-                      </span>
-                      <span className="text-xs text-gray-400 block mt-0.5">{f.academicYear}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <button
-            onClick={fetchClaims}
-            disabled={loading}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 shadow-sm transition-colors disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
-            Refresh
-          </button>
-        </div>
+        <button
+          onClick={fetchClaims}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 shadow-sm transition-colors disabled:opacity-60"
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
+          Refresh
+        </button>
       </div>
+
       {/* Info banner for FC */}
       {currentUserPosition === 'FEST_COORDINATOR' && (
         <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <Info size={15} className="text-amber-600 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700">
-            <span className="font-semibold">As Fest Coordinator</span>, you can directly verify both Coordinator and Sub-Coordinator claims.
-            Any one verification is enough (Coordinator or Fest Coordinator).
-            Claims submitted by Fest Coordinators are auto-verified.
+            <span className="font-semibold">As Fest Coordinator</span>, you can verify both Coordinator and Sub-Coordinator claims.
+            Coordinator claims can be verified directly by you — they skip the coordinator verification stage.
+            You can also reject any claim at any point.
           </p>
         </div>
       )}
@@ -630,13 +590,13 @@ export function VerifyReimbursementView({
           <Info size={15} className="text-violet-600 shrink-0 mt-0.5" />
           <p className="text-xs text-violet-700">
             <span className="font-semibold">As Coordinator</span>, you can verify Sub-Coordinator claims.
-            Once you verify, the claim moves directly to Fest Secretary approval.
+            After your verification, claims move to the Fest Coordinator for final verification.
           </p>
         </div>
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
           { label: 'Pending', value: pendingCount, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
           { label: 'Verified', value: verifiedCount, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
@@ -648,6 +608,25 @@ export function VerifyReimbursementView({
           </div>
         ))}
       </div>
+
+      {userFests.length > 1 && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-4">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Fest Scope</label>
+          <select
+            value={selectedFestId}
+            onChange={e => setSelectedFestId(e.target.value)}
+            className="w-full sm:w-auto min-w-[240px] px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+          >
+            <option value="ALL">All Eligible Fests</option>
+            {userFests.map(f => (
+              <option key={f._id} value={f._id}>
+                {f.festName} ({f.academicYear})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Search & Filters */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4 shadow-sm">
         
@@ -711,28 +690,25 @@ export function VerifyReimbursementView({
           <p className="text-xs text-gray-400 mt-1">Try changing the filters above</p>
         </div>
       ) : (
-        <>
-          {/* Mobile / Tablet cards */}
-          <div className="space-y-6 lg:hidden">
-            {Object.entries(festGroups).map(([festName, festClaims]) => (
-              <div key={festName}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles size={14} className="text-amber-500" />
-                  <h2 className="text-sm font-bold text-gray-700">{festName}</h2>
-                  <span className="text-xs text-gray-400">({festClaims.length} claim{festClaims.length !== 1 ? 's' : ''})</span>
-                </div>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-                  {festClaims.map(claim => (
-                    <ClaimCard
-                      key={claim._id}
-                      claim={claim}
-                      currentUserPosition={currentUserPosition}
-                      onVerify={setVerifyTarget}
-                      onReject={setRejectTargetId}
-                      loading={actionLoading === claim._id}
-                    />
-                  ))}
-                </div>
+        <div className="space-y-6">
+          {Object.entries(festGroups).map(([festName, festClaims]) => (
+            <div key={festName}>
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles size={14} className="text-amber-500" />
+                <h2 className="text-sm font-bold text-gray-700">{festName}</h2>
+                <span className="text-xs text-gray-400">({festClaims.length} claim{festClaims.length !== 1 ? 's' : ''})</span>
+              </div>
+              <div className="space-y-3">
+                {festClaims.map(claim => (
+                  <ClaimCard
+                    key={claim._id}
+                    claim={claim}
+                    currentUserPosition={currentUserPosition}
+                    onVerify={setVerifyTarget}
+                    onReject={setRejectTargetId}
+                    loading={actionLoading === claim._id}
+                  />
+                ))}
               </div>
             ))}
           </div>
@@ -825,13 +801,11 @@ export function VerifyReimbursementView({
                 </tbody>
               </table>
             </div>
-          </div>
-        </>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
 export default VerifyReimbursementView;
-
-

@@ -1040,7 +1040,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
 
 interface FestClaimSuccessProps {
   isOpen: boolean; onClose: () => void; onTrackStatus: () => void; onViewRecords: () => void;
-  claimData: { claimId: string; teamName: string; amount: number; receiptsCount: number; submissionDate: Date; status?: string; };
+  claimData: { claimId: string; teamName: string; amount: number; receiptsCount: number; submissionDate: Date; };
   settings?: AdminSettings;
 }
 
@@ -1051,10 +1051,6 @@ export function FestClaimSuccess({ isOpen, onClose, onTrackStatus, onViewRecords
   const settlement = new Date(claimData.submissionDate);
   settlement.setDate(settlement.getDate() + 3);
   const autoApproved = claimData.amount <= settings.autoApproveBelow;
-  const routeText =
-    claimData.status === 'VERIFIED_FEST'
-      ? 'Verified and sent to Fest Secretary for final approval'
-      : 'Sent for verification';
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -1076,7 +1072,7 @@ export function FestClaimSuccess({ isOpen, onClose, onTrackStatus, onViewRecords
             </span>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Fest Claim Submitted!</h2>
-          <p className="text-sm text-gray-500">{routeText}</p>
+          <p className="text-sm text-gray-500">Sent to Team Lead for verification</p>
 
           {autoApproved && (
             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg text-xs text-emerald-700 font-medium">

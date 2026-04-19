@@ -335,28 +335,13 @@ async function submitFestClaim(req, res) {
           isActive: true,
         }).populate('fest');
 
-        const fcMembership = memberships.find(m => m.position === 'FEST_COORDINATOR');
-        if (fcMembership) {
-          // If the student is an FC for this fest, always treat FC as the submitting role.
-          membership = fcMembership;
-        } else if (memberships.length === 1) {
+        if (memberships.length === 1) {
           membership = memberships[0];
         } else if (memberships.length > 1) {
           return res.status(400).json({
             message: 'Please select the exact fest role before submitting this claim.',
           });
         }
-      }
-
-      // Safety: even when a specific memberId was provided, FC role must take precedence if available.
-      if (membership && membership.position !== 'FEST_COORDINATOR') {
-        const fcMembership = await FestMember.findOne({
-          user: user._id,
-          fest: festId,
-          position: 'FEST_COORDINATOR',
-          isActive: true,
-        }).populate('fest');
-        if (fcMembership) membership = fcMembership;
       }
 
       if (!membership) {
@@ -385,26 +370,9 @@ async function submitFestClaim(req, res) {
       const attachments = mapUploadedFilesToAttachments(req.files);
       if (attachments.length === 0) return res.status(400).json({ message: 'At least one document is required for fest claims.' });
 
-      let status = 'PENDING_COORD';
-      if (membership.position === 'FEST_COORDINATOR') {
-        status = 'VERIFIED_FEST';
-      } else if (membership.position === 'COORDINATOR') {
-        status = 'PENDING_FC';
-      } else {
-        status = 'PENDING_COORD';
-      }
+      const status = parsedAmount <= settings.autoApproveBelow ? 'APPROVED' : 'PENDING_COORD';
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + settings.claimExpiryDays);
-
-      const initialVerifications = membership.position === 'FEST_COORDINATOR'
-        ? [{
-            stage: 'FEST_COORDINATOR',
-            verifiedBy: user._id,
-            verifierName: user.fullName,
-            verifiedAt: new Date(),
-            remarks: 'Auto-verified because claim was submitted by Fest Coordinator.',
-          }]
-        : [];
 
       const newClaim = new RefundRequest({
         claimId: createClaimId('FEST'),
@@ -423,18 +391,12 @@ async function submitFestClaim(req, res) {
         description: expenseDescription,
         attachments,
         status,
-        verifications: initialVerifications,
         expiresAt,
         history: [{
             action: 'SUBMITTED',
             byUser: user._id,
             byName: user.fullName,
-            comments:
-              status === 'VERIFIED_FEST'
-                ? 'Auto-verified (submitted by Fest Coordinator).'
-                : status === 'PENDING_FC'
-                  ? 'Claim applied and routed to Fest Coordinator.'
-                  : 'Claim applied and routed for verification.',
+            comments: status === 'APPROVED' ? `Auto-approved (₹${parsedAmount} ≤ ₹${settings.autoApproveBelow})` : 'Claim applied',
         }],
       });
 
