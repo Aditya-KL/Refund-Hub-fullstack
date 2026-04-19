@@ -99,6 +99,9 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
   const visibleItems = NAV_ITEMS.filter(item =>
     !item.requiredRoles || (userRole && item.requiredRoles.includes(userRole))
   );
+  const nonProfileItems = visibleItems.filter(i => i.id !== 'profile');
+  const regularItems = nonProfileItems.filter(i => !i.requiredRoles);
+  const festManagementItems = nonProfileItems.filter(i => i.requiredRoles && i.requiredRoles.length > 0);
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -192,32 +195,31 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
         </div>
 
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          {visibleItems
-            .filter(i => !['profile'].includes(i.id))
-            .map((item, idx) => {
-              // Insert section label before fest-management items
-              const isFestItem = item.requiredRoles && item.requiredRoles.length > 0;
-              const prevItem = visibleItems.filter(i => !['profile'].includes(i.id))[idx - 1];
-              const prevIsFest = prevItem?.requiredRoles && prevItem.requiredRoles.length > 0;
-              const showLabel = isFestItem && !prevIsFest;
+          {regularItems.map(item => (
+            <SidebarItem
+              key={item.id}
+              item={item}
+              isActive={activeItem === item.id}
+              onClick={() => onItemClick(item.id)}
+            />
+          ))}
 
-              return (
-                <div key={item.id}>
-                  {showLabel && (
-                    <div className="pt-3 pb-1">
-                      <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                        Fest Management
-                      </p>
-                    </div>
-                  )}
-                  <SidebarItem
-                    item={item}
-                    isActive={activeItem === item.id}
-                    onClick={() => onItemClick(item.id)}
-                  />
-                </div>
-              );
-            })}
+          {festManagementItems.length > 0 && (
+            <div className="pt-3 pb-1">
+              <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                Fest Management
+              </p>
+            </div>
+          )}
+
+          {festManagementItems.map(item => (
+            <SidebarItem
+              key={item.id}
+              item={item}
+              isActive={activeItem === item.id}
+              onClick={() => onItemClick(item.id)}
+            />
+          ))}
         </nav>
 
         <div className="px-3 py-3 border-t border-gray-100">

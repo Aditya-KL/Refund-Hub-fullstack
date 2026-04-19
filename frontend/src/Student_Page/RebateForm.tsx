@@ -883,6 +883,14 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
   if (!isOpen) return null;
 
   const maxAmt = settings.maxMedicalReimbursement;
+  const getAmountError = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Valid amount is required';
+    const parsed = parseFloat(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 'Valid amount is required';
+    if (parsed > maxAmt) return `Exceeds max Rs. ${maxAmt.toLocaleString()}`;
+    return '';
+  };
 
   const maxDateObj = new Date();
   const maxDate = format(maxDateObj, 'yyyy-MM-dd');
@@ -907,11 +915,16 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
     const e: Record<string, string> = {};
     if (!hospital.trim()) e.hospital = 'Hospital name is required';
     if (!date) e.date = 'Treatment date is required';
-    if (!amount || parseFloat(amount) <= 0) e.amount = 'Valid amount is required';
-    else if (parseFloat(amount) > maxAmt) e.amount = `Exceeds max ₹${maxAmt.toLocaleString()}`;
+    const amountError = getAmountError(amount);
+    if (amountError) e.amount = amountError;
     if (!files.length) e.bills = 'At least one medical bill is required';
     setErrors(e); return Object.keys(e).length === 0;
   };
+
+  const liveAmountError = amount ? getAmountError(amount) : '';
+  const isSubmitDisabled = submitting || Boolean(liveAmountError);
+
+
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -972,7 +985,12 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">₹</span>
                 <input type="number" value={amount}
-                  onChange={e => { setAmount(e.target.value); setErrors(p => ({ ...p, amount: '' })); }}
+                  onChange={e => {
+                    const next = e.target.value;
+                    setAmount(next);
+                    const nextError = next ? getAmountError(next) : '';
+                    setErrors(p => ({ ...p, amount: nextError }));
+                  }}
                   placeholder="0.00" step="0.01" min="0" max={maxAmt}
                   className={`w-full pl-8 pr-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 ${errors.amount ? 'border-red-400' : 'border-gray-200'}`} />
               </div>
@@ -1019,7 +1037,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
             className="px-5 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors disabled:opacity-50">
             ← Back
           </button>
-          <button disabled={submitting}
+          <button disabled={isSubmitDisabled}
             onClick={async () => {
               if (validate()) {
                 setSubmitting(true);

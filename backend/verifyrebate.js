@@ -394,20 +394,24 @@ async function verifyMessClaim(req, res) {
       claimId,
       {
         $set: {
-          status: 'VERIFIED_MESS',
+          status: 'APPROVED',
           verifiedBy: verifierId,
           verifiedByName: verifierName,
           verifiedAt: new Date(),
           verifierRemarks: remarks || '',
+          approvedBy: verifierId,
+          approvedByName: verifierName,
+          approvedAt: new Date(),
+          approverRemarks: remarks || 'Directly approved by Mess secretary.',
           effectiveMessDays: effectiveDays,
           effectiveAmount,
         },
         $push: {
           history: {
-            action: 'VERIFIED_BY_MESS_MANAGER',
+            action: 'DIRECT_APPROVED_BY_MESS_MANAGER',
             byUser: verifierId,
             byName: verifierName,
-            comments: remarks || autoComment,
+            comments: remarks || `${autoComment} Directly approved for refund.`,
           },
         },
       },
@@ -423,7 +427,7 @@ async function verifyMessClaim(req, res) {
       details: `Mess secretary verified claim ${populated.claimId} for ${populated.student?.fullName || 'student'} with effective amount ₹${effectiveAmount}.`,
     });
 
-    res.status(200).json({ message: 'Mess claim verified.', claim: populated });
+    res.status(200).json({ message: 'Mess claim approved.', claim: populated });
   } catch (err) {
     console.error('verifyMessClaim error:', err);
     res.status(500).json({ message: 'Server error during mess verification.' });
@@ -455,18 +459,22 @@ async function verifyMedicalClaim(req, res) {
       claimId,
       {
         $set: {
-          status: 'VERIFIED_MEDICAL',
+          status: 'APPROVED',
           verifiedBy: verifierId,
           verifiedByName: verifierName,
           verifiedAt: new Date(),
           verifierRemarks: remarks || '',
+          approvedBy: verifierId,
+          approvedByName: verifierName,
+          approvedAt: new Date(),
+          approverRemarks: remarks || 'Directly approved by Medical secretary.',
         },
         $push: {
           history: {
-            action: 'VERIFIED_BY_ACADEMIC',
+            action: 'DIRECT_APPROVED_BY_ACADEMIC',
             byUser: verifierId,
             byName: verifierName,
-            comments: remarks || 'Verified by Medical Department.',
+            comments: remarks || 'Verified and directly approved by Medical Department.',
           },
         },
       },
@@ -482,7 +490,7 @@ async function verifyMedicalClaim(req, res) {
       details: `Medical secretary verified claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
     });
 
-    res.status(200).json({ message: 'Medical claim verified.', claim: populated });
+    res.status(200).json({ message: 'Medical claim approved.', claim: populated });
   } catch (err) {
     console.error('verifyMedicalClaim error:', err);
     res.status(500).json({ message: 'Server error during medical verification.' });
@@ -608,6 +616,77 @@ async function approveClaim(req, res) {
   } catch (err) {
     console.error('approveClaim error:', err);
     res.status(500).json({ message: 'Server error during approval.' });
+  }
+}
+
+// ─── UNDO approval for mess/medical secretary (approved -> pending) ───────────
+async function undoClaimApproval(req, res) {
+  try {
+    const { claimId } = req.params;
+    const { undoBy, undoByName, remarks } = req.body;
+
+    const missing = requireFields(req.body, ['undoBy', 'undoByName']);
+    if (missing) return res.status(400).json({ message: missing });
+    if (!isValidObjectId(claimId)) return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(undoBy)) return res.status(400).json({ message: 'Invalid undoBy.' });
+
+    const claim = await RefundRequest.findById(claimId);
+    if (!claim) return res.status(404).json({ message: 'Claim not found.' });
+    if (!['MESS_REBATE', 'MEDICAL_REBATE'].includes(claim.requestType))
+      return res.status(400).json({ message: 'Undo approval is only supported for Mess/Medical claims.' });
+    if (claim.status !== 'APPROVED')
+      return res.status(400).json({ message: `Only approved claims can be undone. Current status: '${claim.status}'.` });
+
+    const actor = await User.findById(undoBy);
+    if (!actor || (!actor.isSecretary && !actor.isSuperAdmin))
+      return res.status(403).json({ message: 'Insufficient permissions to undo approval.' });
+
+    const requiredDept = claim.requestType === 'MESS_REBATE' ? 'mess' : 'hospital';
+    if (!actor.isSuperAdmin && actor.department !== requiredDept)
+      return res.status(403).json({ message: 'You can only undo approvals for your own department.' });
+
+    const pendingStatus = claim.requestType === 'MESS_REBATE' ? 'PENDING_MESS_MANAGER' : 'PENDING_ACADEMIC';
+
+    const populated = await RefundRequest.findByIdAndUpdate(
+      claimId,
+      {
+        $set: { status: pendingStatus },
+        $unset: {
+          verifiedBy: '',
+          verifiedByName: '',
+          verifiedAt: '',
+          verifierRemarks: '',
+          approvedBy: '',
+          approvedByName: '',
+          approvedAt: '',
+          approverRemarks: '',
+        },
+        $push: {
+          history: {
+            action: 'APPROVAL_UNDONE',
+            byUser: undoBy,
+            byName: undoByName,
+            comments: remarks || `Approval undone by ${undoByName}; claim moved back to pending review.`,
+          },
+        },
+      },
+      { returnDocument: 'after' },
+    ).populate('student', 'fullName email studentId');
+
+    await createAuditLog({
+      secretaryId: undoBy,
+      secretaryName: undoByName,
+      action: 'UNDO_APPROVAL',
+      targetCollection: 'claims',
+      targetId: populated.claimId,
+      details: `Approval undone for claim ${populated.claimId}; moved back to ${pendingStatus}.`,
+      status: 'warning',
+    });
+
+    res.status(200).json({ message: 'Claim approval undone.', claim: populated });
+  } catch (err) {
+    console.error('undoClaimApproval error:', err);
+    res.status(500).json({ message: 'Server error undoing claim approval.' });
   }
 }
 
@@ -996,6 +1075,7 @@ function registerVerifyRoutes(app) {
   app.post('/api/verify/medical/claims/:claimId/verify',      verifyMedicalClaim);
   app.post('/api/verify/claims/:claimId/reject',              rejectClaim);
   app.post('/api/verify/claims/:claimId/approve',             approveClaim);
+  app.post('/api/verify/claims/:claimId/undo-approval',       undoClaimApproval);
   app.post('/api/verify/push-to-accounts',                    pushClaimsToAccounts);
   app.post('/api/verify/accounts/export-batch',               exportAccountsBatch);
   app.post('/api/verify/accounts/batches/:batchId/refund',    refundAccountsBatch);
@@ -1015,6 +1095,7 @@ module.exports = {
   verifyMedicalClaim,
   rejectClaim,
   approveClaim,
+  undoClaimApproval,
   pushClaimsToAccounts,
   exportAccountsBatch,
   refundAccountsBatch,

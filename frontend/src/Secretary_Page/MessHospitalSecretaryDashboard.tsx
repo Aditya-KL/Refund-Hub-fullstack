@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
   Home, ClipboardList, Archive, User,
   TrendingUp, Clock, CheckCircle, DollarSign,
   Search, Eye, RotateCcw, Pencil, Save, X,
   KeyRound, Loader2, RefreshCw, XCircle, AlertTriangle,
-  BadgeCheck,
 } from 'lucide-react';
 import {
   SecretaryLayout, ClaimReviewPanel,
@@ -13,10 +12,10 @@ import {
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
 
-// ─── API Base ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ API Base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BASE = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
-// ─── Map backend status → frontend status ─────────────────────────────────────
+// â”€â”€â”€ Map backend status â†’ frontend status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function mapStatus(s: string): string {
   const map: Record<string, string> = {
     PENDING_MESS_MANAGER: 'pending',
@@ -31,14 +30,7 @@ function mapStatus(s: string): string {
   return map[s] ?? s.toLowerCase();
 }
 
-// ─── Map frontend status → real backend status ────────────────────────────────
-function toBackendStatus(dept: Department, frontendStatus: string): string {
-  if (frontendStatus === 'pending') return dept === 'mess' ? 'PENDING_MESS_MANAGER' : 'PENDING_ACADEMIC';
-  if (frontendStatus === 'verified') return dept === 'mess' ? 'VERIFIED_MESS' : 'VERIFIED_MEDICAL';
-  return frontendStatus.toUpperCase();
-}
-
-// ─── Fetch claims from backend ─────────────────────────────────────────────────
+// â”€â”€â”€ Fetch claims from backend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function fetchClaimsFromAPI(dept: Department): Promise<Claim[]> {
   const typeMap: Record<string, string> = {
     mess:     'MESS_REBATE',
@@ -117,7 +109,7 @@ function makeFallbackUser(dept: Department): SecretaryUser {
   };
 }
 
-// ─── Dynamic Profile Page ──────────────────────────────────────────────────────
+// â”€â”€â”€ Dynamic Profile Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function DynamicProfilePage({
   user, setUser, department,
 }: {
@@ -188,9 +180,9 @@ function DynamicProfilePage({
       <div className="rounded-2xl p-5 flex items-center gap-4" style={{ background: cfg.accent }}>
         <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center text-white font-black text-xl flex-shrink-0">{initials}</div>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-bold text-lg leading-tight">{user.fullName || '—'}</p>
-          <p className="text-white/80 text-sm">{user.designation} · {cfg.label}</p>
-          <p className="text-white/60 text-xs mt-0.5">{user.employeeId || '—'}</p>
+          <p className="text-white font-bold text-lg leading-tight">{user.fullName || 'â€”'}</p>
+          <p className="text-white/80 text-sm">{user.designation} Â· {cfg.label}</p>
+          <p className="text-white/60 text-xs mt-0.5">{user.employeeId || 'â€”'}</p>
         </div>
         {!isEditing && (
           <button onClick={() => { setIsEditing(true); setEditSuccess(''); setEditError(''); }}
@@ -234,7 +226,7 @@ function DynamicProfilePage({
                 className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold disabled:opacity-60"
                 style={{ background: cfg.accent }}>
                 {editLoading ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                {editLoading ? 'Saving…' : 'Save Changes'}
+                {editLoading ? 'Savingâ€¦' : 'Save Changes'}
               </button>
               <button onClick={() => { setIsEditing(false); setEditError(''); }}
                 className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-sm font-semibold">
@@ -245,14 +237,14 @@ function DynamicProfilePage({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
             {[
-              { label: 'Full Name',    value: user.fullName || '—' },
-              { label: 'Email',        value: user.email || '—' },
-              { label: 'Phone',        value: user.phone || '—' },
-              { label: 'Employee ID',  value: user.employeeId || '—' },
-              { label: 'Designation',  value: user.designation || '—' },
-              { label: 'Institution',  value: user.institution || '—' },
-              { label: 'Member Since', value: user.joinDate ? new Date(user.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
-              { label: 'Last Login',   value: user.lastLogin ? new Date(user.lastLogin).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—' },
+              { label: 'Full Name',    value: user.fullName || 'â€”' },
+              { label: 'Email',        value: user.email || 'â€”' },
+              { label: 'Phone',        value: user.phone || 'â€”' },
+              { label: 'Employee ID',  value: user.employeeId || 'â€”' },
+              { label: 'Designation',  value: user.designation || 'â€”' },
+              { label: 'Institution',  value: user.institution || 'â€”' },
+              { label: 'Member Since', value: user.joinDate ? new Date(user.joinDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”' },
+              { label: 'Last Login',   value: user.lastLogin ? new Date(user.lastLogin).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'â€”' },
             ].map(field => (
               <div key={field.label}>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{field.label}</p>
@@ -269,7 +261,7 @@ function DynamicProfilePage({
             <KeyRound size={16} className="text-slate-500" />
             <span className="font-bold text-slate-700 text-sm">Change Password</span>
           </div>
-          <span className="text-xs text-slate-400 font-medium">{showPassword ? '▲ Hide' : '▼ Show'}</span>
+          <span className="text-xs text-slate-400 font-medium">{showPassword ? 'â–² Hide' : 'â–¼ Show'}</span>
         </button>
         {showPassword && (
           <div className="mt-5 space-y-4">
@@ -286,7 +278,7 @@ function DynamicProfilePage({
                   onChange={e => setPwForm(f => ({ ...f, [field.key]: e.target.value }))}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
                   style={{ '--tw-ring-color': cfg.accent } as any}
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                 />
               </div>
             ))}
@@ -296,7 +288,7 @@ function DynamicProfilePage({
               className="flex items-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold disabled:opacity-60"
               style={{ background: cfg.accent }}>
               {pwLoading ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
-              {pwLoading ? 'Updating…' : 'Update Password'}
+              {pwLoading ? 'Updatingâ€¦' : 'Update Password'}
             </button>
           </div>
         )}
@@ -305,7 +297,7 @@ function DynamicProfilePage({
   );
 }
 
-// ─── Overview Page ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Overview Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function OverviewPage({ claims, dept }: { claims: Claim[]; dept: Department }) {
   const cfg = deptConfig[dept];
   const stats = {
@@ -332,7 +324,7 @@ function OverviewPage({ claims, dept }: { claims: Claim[]; dept: Department }) {
         <StatCard label="Total Claims"    value={stats.total}    icon={TrendingUp}  color={`bg-${dept === 'mess' ? 'emerald' : 'blue'}-100 text-${dept === 'mess' ? 'emerald' : 'blue'}-600`} />
         <StatCard label="Pending Review"  value={stats.pending}  icon={Clock}       color="bg-amber-100 text-amber-600" />
         <StatCard label="Approved"        value={stats.approved} icon={CheckCircle} color="bg-green-100 text-green-600" />
-        <StatCard label="Approved Value"  value={`₹${(stats.totalAmt / 1000).toFixed(1)}K`} icon={DollarSign} color="bg-teal-100 text-teal-600" />
+        <StatCard label="Approved Value"  value={ `₹${(stats.totalAmt / 1000).toFixed(1)}K` } icon={DollarSign} color="bg-teal-100 text-teal-600" />
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
@@ -398,7 +390,7 @@ function OverviewPage({ claims, dept }: { claims: Claim[]; dept: Department }) {
   );
 }
 
-// ─── Claims Page ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Claims Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ClaimsPage({
   claims, setClaims, dept, secretary,
 }: {
@@ -408,7 +400,7 @@ function ClaimsPage({
   secretary: SecretaryUser | null;
 }) {
   const [selected, setSelected] = useState<Claim | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'verified' | 'rejected'>('pending');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'rejected'>('pending');
   const [search, setSearch] = useState('');
   const [actionError, setActionError] = useState('');
   const cfg = deptConfig[dept];
@@ -476,7 +468,7 @@ function ClaimsPage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">{dept === 'mess' ? 'Mess Rebate Claims' : 'Medical Claims'}</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Review, verify or reject incoming claims</p>
+          <p className="text-slate-500 text-sm mt-0.5">Review and directly approve or reject incoming claims</p>
         </div>
         <span className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-xl text-sm font-bold">
           <Clock size={14} /> {claims.filter(c => c.status === 'pending').length} pending
@@ -498,7 +490,7 @@ function ClaimsPage({
             style={{ '--tw-ring-color': cfg.accent } as any} />
         </div>
         <div className="flex gap-2 overflow-x-auto">
-          {(['all', 'pending', 'verified', 'rejected'] as const).map(s => (
+          {(['all', 'pending', 'rejected'] as const).map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'}`}
               style={statusFilter === s ? { background: cfg.accent } : {}}>
@@ -629,8 +621,9 @@ function ClaimsPage({
   );
 }
 
-// ─── Verified & Approved Page ─────────────────────────────────────────────────
-function VerifiedRebatesPage({
+// â”€â”€â”€ Verified & Approved Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Approved History Page -----------------------------------------------------
+function ApprovedHistoryPage({
   claims, setClaims, dept, secretary,
 }: {
   claims: Claim[];
@@ -640,19 +633,20 @@ function VerifiedRebatesPage({
 }) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'approved' | 'disbursed' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'disbursed'>('all');
   const [actionError, setActionError] = useState('');
   const cfg = deptConfig[dept];
 
-  const processedClaims = claims.filter(c => ['verified', 'approved', 'disbursed', 'rejected'].includes(c.status));
+  const processedClaims = claims.filter(c => ['approved', 'disbursed'].includes(c.status));
   const filtered = processedClaims.filter(c => {
     const ms = search.toLowerCase();
     const name = c.student?.fullName || c.studentName || '';
-    const ref  = c.claimRefId || c.claimId || '';
+    const ref = c.claimRefId || c.claimId || '';
     return (statusFilter === 'all' || c.status === statusFilter) &&
       (name.toLowerCase().includes(ms) || ref.toLowerCase().includes(ms));
   });
 
+  const handleUndoApproval = async (id: string) => {
   const handleApprove = async (id: string) => {
     if (!secretary) return;
     setActionError('');
@@ -676,23 +670,22 @@ function VerifiedRebatesPage({
     if (!secretary) return;
     setActionError('');
     try {
-      const res = await fetch(`${BASE}/api/verify/claims/${id}/reject`, {
+      const res = await fetch(`${BASE}/api/verify/claims/${id}/undo-approval`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rejectedBy: secretary._id,
-          rejectedByName: secretary.fullName,
-          rejectionReason: reason,
-          stage: stage || `SECRETARY_${dept.toUpperCase()}`,
+          undoBy: secretary._id,
+          undoByName: secretary.fullName,
+          remarks: `Approval undone by ${secretary.fullName}`,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Rejection failed');
+      if (!res.ok) throw new Error(data.message || 'Undo failed');
       const updated = data.claim;
       setClaims(prev => prev.map(c => c._id === id ? { ...c, ...updated, status: mapStatus(updated.status) } : c));
       setSelected(null);
     } catch (err: any) {
-      setActionError(err.message || 'Failed to reject claim.');
+      setActionError(err.message || 'Failed to undo approval.');
     }
   };
 
@@ -752,8 +745,8 @@ function VerifiedRebatesPage({
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">Verified {dept === 'mess' ? 'Rebates' : 'Claims'}</h2>
-        <p className="text-slate-500 text-sm mt-0.5">Approve verified claims or revert them if needed</p>
+        <h2 className="text-xl font-bold text-slate-800">Approved {dept === 'mess' ? 'Rebate' : 'Claim'} History</h2>
+        <p className="text-slate-500 text-sm mt-0.5">All approved claims with undo option.</p>
       </div>
 
       {actionError && (
@@ -765,13 +758,13 @@ function VerifiedRebatesPage({
 
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search verified claims..."
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search approved claims..."
           className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2"
           style={{ '--tw-ring-color': cfg.accent } as any} />
       </div>
 
       <div className="flex gap-2 overflow-x-auto">
-        {(['all', 'verified', 'approved', 'disbursed', 'rejected'] as const).map(s => (
+        {(['all', 'approved', 'disbursed'] as const).map(s => (
           <button key={s} onClick={() => setStatusFilter(s)}
             className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'}`}
             style={statusFilter === s ? { background: cfg.accent } : {}}>
@@ -780,12 +773,11 @@ function VerifiedRebatesPage({
         ))}
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Verified',  count: claims.filter(c => c.status === 'verified').length,  color: 'bg-blue-50 text-blue-700 border-blue-100' },
-          { label: 'Approved',  count: claims.filter(c => c.status === 'approved').length,  color: 'bg-green-50 text-green-700 border-green-100' },
+          { label: 'Approved', count: claims.filter(c => c.status === 'approved').length, color: 'bg-green-50 text-green-700 border-green-100' },
           { label: 'Disbursed', count: claims.filter(c => c.status === 'disbursed').length, color: 'bg-purple-50 text-purple-700 border-purple-100' },
-          { label: 'Rejected',  count: claims.filter(c => c.status === 'rejected').length,  color: 'bg-red-50 text-red-700 border-red-100' },
+          { label: 'Total', count: processedClaims.length, color: 'bg-slate-50 text-slate-700 border-slate-100' },
         ].map(s => (
           <div key={s.label} className={`rounded-xl p-3 border text-center ${s.color}`}>
             <p className="text-xl font-black">{s.count}</p>
@@ -930,9 +922,7 @@ function VerifiedRebatesPage({
           claim={selected}
           department={dept}
           onClose={() => setSelected(null)}
-          onApprove={handleApprove}
-          onReject={handleReject}
-          mode={getPanelMode(selected)}
+          mode="view"
           secretaryId={secretary?._id}
           secretaryName={secretary?.fullName}
         />
@@ -940,8 +930,7 @@ function VerifiedRebatesPage({
     </div>
   );
 }
-
-// ─── Shared Dashboard Shell ────────────────────────────────────────────────────
+// â”€â”€â”€ Shared Dashboard Shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function SecretaryDashboardShell({
   department, onLogout, navItems, title, subtitle,
 }: {
@@ -957,6 +946,7 @@ function SecretaryDashboardShell({
   const [claimsLoading, setClaimsLoading] = useState(true);
   const [claimsError, setClaimsError] = useState('');
 
+  // Load user from localStorage â€” no hardcoded fallback data
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (stored) {
@@ -1018,7 +1008,7 @@ function SecretaryDashboardShell({
   const LoadingSpinner = () => (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
       <Loader2 size={28} className="animate-spin text-slate-400" />
-      <p className="text-slate-400 text-sm">Loading claims…</p>
+      <p className="text-slate-400 text-sm">Loading claimsâ€¦</p>
     </div>
   );
 
@@ -1042,7 +1032,7 @@ function SecretaryDashboardShell({
     if (claimsLoading) return <LoadingSpinner />;
     if (claimsError)   return <ErrorState />;
     if (activeView === 'claims')   return <ClaimsPage claims={claims} setClaims={setClaims} dept={department} secretary={user} />;
-    if (activeView === 'verified') return <VerifiedRebatesPage claims={claims} setClaims={setClaims} dept={department} secretary={user} />;
+    if (activeView === 'verified') return <ApprovedHistoryPage claims={claims} setClaims={setClaims} dept={department} secretary={user} />;
     return null;
   };
 
@@ -1062,7 +1052,7 @@ function SecretaryDashboardShell({
   );
 }
 
-// ─── Mess Secretary Dashboard ──────────────────────────────────────────────────
+// â”€â”€â”€ Mess Secretary Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function MessSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <SecretaryDashboardShell
@@ -1071,7 +1061,7 @@ export function MessSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
       navItems={[
         { id: 'overview', label: 'Overview',         icon: Home },
         { id: 'claims',   label: 'Mess Claims',      icon: ClipboardList },
-        { id: 'verified', label: 'Verified Rebates', icon: Archive },
+        { id: 'verified', label: 'Approved History', icon: Archive },
         { id: 'profile',  label: 'Profile',          icon: User },
       ]}
       title="Mess Department"
@@ -1080,7 +1070,7 @@ export function MessSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-// ─── Hospital Secretary Dashboard ─────────────────────────────────────────────
+// â”€â”€â”€ Hospital Secretary Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function HospitalSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <SecretaryDashboardShell
@@ -1097,3 +1087,4 @@ export function HospitalSecretaryDashboard({ onLogout }: { onLogout: () => void 
     />
   );
 }
+

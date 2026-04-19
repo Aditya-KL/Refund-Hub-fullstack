@@ -380,6 +380,29 @@ app.get('/api/users/search', async (req, res) => {
 });
 
 // ─── CHANGE PASSWORD ──────────────────────────────────────────
+
+// Heartbeat: update lastLogin for online presence
+app.post('/api/heartbeat/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: { lastLogin: new Date() } },
+      { new: true },
+    ).select('_id lastLogin');
+
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+    return res.status(200).json({ ok: true, lastLogin: user.lastLogin });
+  } catch (err) {
+    console.error('Heartbeat Error:', err);
+    return res.status(500).json({ message: 'Server error updating heartbeat.' });
+  }
+});
+
 app.post('/api/users/:id/change-password', async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -496,6 +519,20 @@ app.get('/api/fest-members/fcs', async (_req, res) => {
   }
 });
 
+const FEST_ROLE_RANK = {
+  FEST_COORDINATOR: 3,
+  COORDINATOR: 2,
+  SUB_COORDINATOR: 1,
+};
+
+const getHighestFestRole = (members = []) => {
+  if (!members.length) return null;
+  return members.reduce((best, m) => {
+    if (!best) return m;
+    return (FEST_ROLE_RANK[m.position] || 0) > (FEST_ROLE_RANK[best.position] || 0) ? m : best;
+  }, null);
+};
+
 app.post('/api/fest-members/assign-fc', async (req, res) => {
   try {
     const { userId, festId, festName, addedBy } = req.body;
@@ -535,14 +572,37 @@ app.post('/api/fest-members/assign-fc', async (req, res) => {
 
 app.delete('/api/fest-members/:memberId/remove-fc', async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.memberId))
+    const { memberId } = req.params;
+    const { removedBy } = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(memberId))
       return res.status(400).json({ message: 'Invalid member ID.' });
-    const member = await FestMember.findById(req.params.memberId).populate('user', '_id fullName');
+
+    if (!removedBy || !mongoose.Types.ObjectId.isValid(removedBy))
+      return res.status(400).json({ message: 'Valid removedBy is required.' });
+
+    const actor = await User.findById(removedBy).select('_id isSecretary isSuperAdmin');
+    if (!actor || (!actor.isSecretary && !actor.isSuperAdmin))
+      return res.status(403).json({ message: 'Only secretaries or superadmins can remove FCs.' });
+
+    const member = await FestMember.findById(memberId).populate('user', '_id fullName');
     if (!member) return res.status(404).json({ message: 'FC record not found.' });
-    member.isActive = false;
-    await member.save();
-    await User.findByIdAndUpdate(member.user._id, { $set: { role: 'STUDENT' } });
-    res.status(200).json({ message: `FC removed. ${member.user.fullName} reverted to STUDENT.` });
+    if (member.position !== 'FEST_COORDINATOR')
+      return res.status(400).json({ message: 'Target member is not an FC.' });
+
+    await member.deleteOne();
+
+    const stillHasActiveFC = await FestMember.exists({
+      user: member.user._id,
+      position: 'FEST_COORDINATOR',
+      isActive: true,
+    });
+
+    if (!stillHasActiveFC) {
+      await User.findByIdAndUpdate(member.user._id, { $set: { role: 'STUDENT' } });
+    }
+
+    res.status(200).json({ message: `FC removed from database. ${member.user.fullName} role updated.` });
   } catch (err) {
     res.status(500).json({ message: 'Server error removing FC.' });
   }
@@ -585,11 +645,29 @@ app.post('/api/fest-members', async (req, res) => {
       return res.status(400).json({ message: 'userId, festId, position, academicYear required.' });
     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(festId))
       return res.status(400).json({ message: 'Invalid userId or festId.' });
+    if (!addedBy || !mongoose.Types.ObjectId.isValid(addedBy))
+      return res.status(400).json({ message: 'Valid addedBy is required.' });
+    if (!['FEST_COORDINATOR', 'COORDINATOR', 'SUB_COORDINATOR'].includes(position))
+      return res.status(400).json({ message: 'Invalid position.' });
+    if (position === 'FEST_COORDINATOR')
+      return res.status(400).json({ message: 'Use assign-fc endpoint for FC appointments.' });
 
     const userModel = mongoose.model('User');
     const u = await userModel.findById(userId);
     if (!u || u.department?.toLowerCase() !== 'general')
       return res.status(403).json({ message: 'Only General dept students can join fest.' });
+
+    const actorMemberships = await FestMember.find({
+      user: addedBy,
+      fest: festId,
+      academicYear,
+      isActive: true,
+    });
+    const actorRole = getHighestFestRole(actorMemberships);
+    if (!actorRole || !['FEST_COORDINATOR', 'COORDINATOR'].includes(actorRole.position))
+      return res.status(403).json({ message: 'Only FCs or Coordinators can add team members for this fest.' });
+    if (actorRole.position === 'COORDINATOR' && position !== 'SUB_COORDINATOR')
+      return res.status(403).json({ message: 'Coordinators can only add Sub Coordinators.' });
 
     const existing = await FestMember.findOne({ user: userId, fest: festId, academicYear, isActive: true });
     if (existing) return res.status(409).json({ message: 'Already a member.' });
@@ -610,12 +688,34 @@ app.post('/api/fest-members', async (req, res) => {
 app.delete('/api/fest-members/:memberId', async (req, res) => {
   try {
     const { memberId } = req.params;
+    const { removedBy } = req.body || {};
     if (memberId === 'remove-fc') return res.status(400).json({ message: 'Use the remove-fc endpoint.' });
     if (!mongoose.Types.ObjectId.isValid(memberId)) return res.status(400).json({ message: 'Invalid member ID.' });
+    if (!removedBy || !mongoose.Types.ObjectId.isValid(removedBy))
+      return res.status(400).json({ message: 'Valid removedBy is required.' });
+
     const member = await FestMember.findById(memberId);
     if (!member) return res.status(404).json({ message: 'Member not found.' });
     if (member.position === 'FEST_COORDINATOR')
       return res.status(400).json({ message: 'Use remove-fc endpoint for FCs.' });
+
+    const actorMemberships = await FestMember.find({
+      user: removedBy,
+      fest: member.fest,
+      academicYear: member.academicYear,
+      isActive: true,
+    });
+    const actorRole = getHighestFestRole(actorMemberships);
+    if (!actorRole || !['FEST_COORDINATOR', 'COORDINATOR'].includes(actorRole.position))
+      return res.status(403).json({ message: 'Only FCs or Coordinators can remove members in this fest.' });
+
+    const actorRank = FEST_ROLE_RANK[actorRole.position] || 0;
+    const targetRank = FEST_ROLE_RANK[member.position] || 0;
+    if (actorRank <= targetRank)
+      return res.status(403).json({ message: 'You can only remove members below your own role.' });
+    if (String(member.user) === String(removedBy))
+      return res.status(403).json({ message: 'You cannot remove yourself.' });
+
     await member.deleteOne();
     res.json({ message: 'Member removed.', memberId });
   } catch (err) {

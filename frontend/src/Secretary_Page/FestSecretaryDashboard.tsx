@@ -618,7 +618,11 @@ function AppointFCPage({
     setRemoveLoading(true);
     setRemoveError('');
     try {
-      const res = await fetch(`${BASE}/api/fest-members/${memberId}/remove-fc`, { method: 'DELETE' });
+      const res = await fetch(`${BASE}/api/fest-members/${memberId}/remove-fc`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ removedBy: currentUserId }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to remove FC.');
       setFcList(prev => prev.filter(fc => fc.memberId !== memberId));
