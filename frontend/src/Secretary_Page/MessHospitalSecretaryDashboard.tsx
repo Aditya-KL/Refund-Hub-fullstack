@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   SecretaryLayout, ClaimReviewPanel,
-  StatCard, StatusBadge, deptConfig,
+  StatCard, StatusBadge, deptConfig, FloatingSuccessToast,
   type Claim, type SecretaryUser, type Department,
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
@@ -128,6 +128,7 @@ function DynamicProfilePage({
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
+  const [pwToastVisible, setPwToastVisible] = useState(false);
 
   useEffect(() => {
     if (user) setEditForm({ fullName: user.fullName ?? '', phone: user.phone ?? '', institution: user.institution ?? '' });
@@ -160,6 +161,8 @@ function DynamicProfilePage({
       setPwSuccess('Password changed!');
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPassword(false);
+      setPwToastVisible(true);
+      setTimeout(() => setPwToastVisible(false), 2500);
     } catch (err: any) {
       setPwError(err.message || 'Failed to change password.');
     } finally { setPwLoading(false); }
@@ -177,6 +180,7 @@ function DynamicProfilePage({
 
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5 max-w-3xl mx-auto">
+      <FloatingSuccessToast message="Password updated successfully" visible={pwToastVisible} />
       <div className="rounded-2xl p-5 flex items-center gap-4" style={{ background: cfg.accent }}>
         <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center text-white font-black text-xl flex-shrink-0">{initials}</div>
         <div className="flex-1 min-w-0">
@@ -1058,7 +1062,7 @@ export function HospitalSecretaryDashboard({ onLogout }: { onLogout: () => void 
       navItems={[
         { id: 'overview', label: 'Overview',        icon: Home },
         { id: 'claims',   label: 'Medical Claims',  icon: ClipboardList },
-        { id: 'verified', label: 'Verified Claims', icon: Archive },
+        { id: 'verified', label: 'Approved History', icon: Archive },
         { id: 'profile',  label: 'Profile',         icon: User },
       ]}
       title="Medical Department"

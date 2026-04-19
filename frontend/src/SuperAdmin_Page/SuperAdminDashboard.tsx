@@ -756,6 +756,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   const [loadingClaims, setLoadingClaims] = useState(true);
   const [adminActionLoading, setAdminActionLoading] = useState<string | null>(null);
   const didLoadSecretariesRef = useRef(false);
+  const secretariesSnapshotRef = useRef('');
 
   const baseUrl = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
   const storedUser = (() => {
@@ -786,17 +787,18 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           setLoadingSecretaries(true);
         }
         const data = await apiService.getSecretaries();
-        setSecretaries(prev => {
-          const next = Array.isArray(data) ? data : [];
-          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-        });
+        const next = Array.isArray(data) ? data : [];
+        const normalized = [...next].sort((a, b) => a._id.localeCompare(b._id));
+        const snapshot = JSON.stringify(normalized);
+        if (secretariesSnapshotRef.current !== snapshot) {
+          secretariesSnapshotRef.current = snapshot;
+          setSecretaries(normalized);
+        }
         didLoadSecretariesRef.current = true;
       } catch (error) {
         console.error("Error fetching secretaries:", error);
       } finally {
-        if (showLoader && !didLoadSecretariesRef.current) {
-          setLoadingSecretaries(false);
-        } else if (showLoader) {
+        if (showLoader) {
           setLoadingSecretaries(false);
         }
       }
@@ -1450,4 +1452,3 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     </div>
   );
 }
-
