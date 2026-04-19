@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+
 // ─── Admin Settings Type ──────────────────────────────────────
 export interface AdminSettings {
   messRebateRateDaily: number;        // ₹/day
@@ -175,22 +176,19 @@ interface SelectCategoryModalProps {
   onNext: (category: string) => void;
   isFestMember?: boolean;
   settings?: AdminSettings;
+  showToast?: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
 export function SelectCategoryModal({
   isOpen, onClose, onNext,
   isFestMember = false,
-  settings = DEFAULT_SETTINGS
+  settings = DEFAULT_SETTINGS,
+  showToast // 🔥 Accept the prop
 }: SelectCategoryModalProps) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [portalError, setPortalError] = useState<string | null>(null);
-  
-  useEffect(() => {
-    if (portalError) {
-      const timer = setTimeout(() => setPortalError(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [portalError]);
+
+  // 🔥 We REMOVED the portalError state and useEffect entirely!
+
   if (!isOpen) return null;
 
   // Portal / maintenance guard
@@ -198,14 +196,14 @@ export function SelectCategoryModal({
     return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center animate-in fade-in zoom-in-95 duration-200">
           <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertTriangle size={32} className="text-amber-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Portal Under Maintenance</h2>
           <p className="text-gray-600 text-sm">{settings.maintenanceMessage}</p>
           <button onClick={onClose}
-            className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-medium text-sm">
+            className="mt-6 px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-medium text-sm transition-colors">
             Close
           </button>
         </div>
@@ -269,21 +267,10 @@ export function SelectCategoryModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSelected(null); onClose(); }} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onClick={() => { setSelected(null); onClose(); }} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
-        {portalError && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-8 duration-300">
-          <div className="flex items-center gap-3 px-5 py-3 bg-gray-900 border border-gray-800 shadow-2xl shadow-red-500/20 rounded-full w-max max-w-[90vw]">
-            <div className="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
-              <AlertTriangle size={14} className="text-red-400" />
-            </div>
-            <p className="text-sm font-medium text-white tracking-wide pr-2">
-              {portalError}
-            </p>
-          </div>
-        </div>
-      )}
+        {/* 🔥 We REMOVED the old portalError red banner div entirely! */}
 
         {/* Header */}
         <div className="px-6 pt-6 pb-5 border-b border-gray-100">
@@ -306,12 +293,9 @@ export function SelectCategoryModal({
             const isSelected = selected === cat.id;
             return (
               <button key={cat.id} 
-                onClick={() => { 
-                  setSelected(cat.id); 
-                  setPortalError(null);
-                }}
+                onClick={() => setSelected(cat.id)} // 🔥 Removed setPortalError
                 className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-150
-                  ${isSelected ? `ring-2 ${c.ring} border-transparent` : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}`}>
+                  ${isSelected ? `ring-2 ${c.ring} border-transparent scale-[1.01]` : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}`}>
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
                     ${isSelected ? c.bg : 'bg-gray-100'} transition-colors`}>
@@ -347,18 +331,9 @@ export function SelectCategoryModal({
           )}
         </div>
 
-        {/* {portalError && (
-          <div className="px-5 pb-2">
-            <div className="flex items-center gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-bottom-2">
-              <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
-              <p className="text-sm font-semibold text-red-800">{portalError}</p>
-            </div>
-          </div>
-        )} */}
-
         {/* Footer */}
         <div className="px-5 pb-5 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <button onClick={() => { setSelected(null); setPortalError(null); onClose(); }}
+          <button onClick={() => { setSelected(null); onClose(); }}
             className="px-5 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
             Cancel
           </button>
@@ -366,30 +341,29 @@ export function SelectCategoryModal({
           <button 
             onClick={() => { 
               if (selected) { 
-                // --- CHECK PORTAL SETTINGS BEFORE CONTINUING ---
+                // --- CHECK PORTAL SETTINGS USING NEW TOAST ---
                 if (selected === 'mess-rebate' && !settings.messPortalActive) {
-                  setPortalError('The Mess Claims portal is currently disabled.');
+                  showToast?.('The Mess Claims portal is currently disabled by Admin.', 'error');
                   return;
                 }
                 if (selected === 'fest-activity' && !settings.festPortalActive) {
-                  setPortalError('The Fest Reimbursements portal is currently disabled.');
+                  showToast?.('The Fest Reimbursements portal is currently disabled.', 'error');
                   return;
                 }
                 if (selected === 'medical-rebate' && !settings.hospitalPortalActive) {
-                  setPortalError('The Medical Claims portal is currently disabled.');
+                  showToast?.('The Medical Claims portal is currently disabled.', 'error');
                   return;
                 }
                 
                 // If everything is open, proceed!
                 onNext(selected); 
                 setSelected(null); 
-                setPortalError(null);
               } 
             }}
             disabled={!selected}
-            className="px-7 py-2.5 text-sm rounded-xl font-semibold transition-all
+            className="px-7 py-2.5 text-sm rounded-xl font-semibold transition-all duration-200
               disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed
-              bg-gray-900 hover:bg-gray-800 text-white shadow-sm">
+              bg-gray-900 hover:bg-gray-800 text-white shadow-sm hover:shadow active:scale-[0.98]">
             Continue →
           </button>
         </div>
@@ -415,6 +389,8 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
   const [durationError, setDurationError] = useState(false);
 
   if (!isOpen) return null;
+  const maxDays = settings?.maxMessRebateDays || 15;
+  const minDays = 5; 
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
   const minDateObj = new Date(); 
@@ -544,11 +520,14 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
             {/* Duration pill */}
             {fromDate && toDate && days > 0 && !durationError && (
               <div className={`mt-2.5 flex items-center justify-between px-4 py-2.5 rounded-xl text-sm
-                ${days >= 5 ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
-                <span className={days >= 5 ? 'text-emerald-700 font-medium' : 'text-red-700 font-medium'}>
-                  {days} day{days !== 1 ? 's' : ''} {days >= 5 ? '✓ Eligible' : '✗ Not eligible'}
+                ${days > maxDays || days < minDays ? 'bg-red-50 border border-red-100' : 'bg-emerald-50 border border-emerald-100'}`}>
+                
+                <span className={days > maxDays || days < minDays ? 'text-red-700 font-medium' : 'text-emerald-700 font-medium'}>
+                  {days} day{days !== 1 ? 's' : ''}{' '}
+                  {days > maxDays ? `✗ Exceeds max limit (${maxDays})` : days < minDays ? `✗ Not eligible (Min ${minDays})` : '✓ Eligible'}
                 </span>
-                {days >= 5 && (
+                
+                {days >= minDays && days <= maxDays && (
                   <span className="text-emerald-600 font-semibold">
                     Est. ₹{estimatedAmount.toLocaleString()}
                   </span>
@@ -605,7 +584,8 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
           <button onClick={onBack} className="px-5 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-200 rounded-xl transition-colors">
             ← Back
           </button>
-          <button onClick={() => { if (validate()) { onSubmit({ fromDate, toDate, reason, receiptFiles: files }); reset(); } }}
+          <button 
+            onClick={() => { if (validate()) { onSubmit({ fromDate, toDate, reason, receiptFiles: files }); reset(); } }}
             disabled={durationError}
             className="px-7 py-2.5 text-sm rounded-xl font-semibold bg-gray-900 hover:bg-gray-800 text-white
               disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm">

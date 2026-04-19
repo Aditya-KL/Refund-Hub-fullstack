@@ -710,6 +710,96 @@ export function VerifyReimbursementView({
                   />
                 ))}
               </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px]">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    {['Ref ID', 'Student', 'Committee', 'Role', 'Amount', 'Date', 'Status', 'Action'].map(h => (
+                      <th
+                        key={h}
+                        className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {displayed.map(claim => {
+                    const actorPosition = claim.actorPosition || currentUserPosition;
+                    const hasCoordinatorVerification = (claim.verifications || []).some(v => v.stage === 'COORDINATOR');
+                    const canVerify = (() => {
+                      if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_COORD', 'VERIFIED_FEST'].includes(claim.status)) return false;
+                      if (actorPosition === 'COORDINATOR') {
+                        return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
+                      }
+                      if (actorPosition === 'FEST_COORDINATOR') {
+                        if (hasCoordinatorVerification) return false;
+                        return (
+                          ['COORDINATOR', 'SUB_COORDINATOR'].includes(claim.claimantPosition) &&
+                          ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)
+                        );
+                      }
+                      return false;
+                    })();
+                    const canReject = !['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'].includes(claim.status);
+
+                    return (
+                      <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
+                        <td className="px-4 py-3.5 text-center">
+                          <p className="font-semibold text-slate-700 text-sm text-center">{claim.student.fullName}</p>
+                          <p className="text-xs text-slate-400 text-center">{claim.student.studentId}</p>
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-sm text-slate-600 whitespace-nowrap">{claim.claimantCommittee || 'General'}</td>
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex justify-center">
+                            <RoleBadge role={claim.claimantPosition} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <span className="font-bold text-violet-700">Rs. {claim.amount.toLocaleString('en-IN')}</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-center text-xs text-slate-500 whitespace-nowrap">
+                          {new Date(claim.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex justify-center">
+                            <StatusBadge status={claim.status} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            {canReject && (
+                              <button
+                                onClick={() => setRejectTargetId(claim._id)}
+                                disabled={actionLoading === claim._id}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-60"
+                              >
+                                <XCircle size={12} /> Reject
+                              </button>
+                            )}
+                            {canVerify && (
+                              <button
+                                onClick={() => setVerifyTarget(claim)}
+                                disabled={actionLoading === claim._id}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors disabled:opacity-60"
+                              >
+                                <BadgeCheck size={12} /> Verify
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ))}
         </div>

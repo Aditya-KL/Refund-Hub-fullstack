@@ -29,7 +29,7 @@ import { ManageTeamView } from './FestTeam_View/ManageTeamView';
 import { VerifyReimbursementView } from './FestTeam_View/VerifyReimbursement';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
+type ToastType = { message: string; type: 'success' | 'error' | 'warning' | 'info' } | null;
 type FestRole = 'FEST_COORDINATOR' | 'COORDINATOR' | 'SUB_COORDINATOR';
 
 interface UserFest {
@@ -99,6 +99,16 @@ function BottomNav({
 
 export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+  // ── Custom Native Toast State ──
+  const [toastState, setToastState] = useState<ToastType>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info', duration = 5000) => {
+    setToastState({ message, type });
+    if (type !== 'info') {
+      setTimeout(() => setToastState(null), duration);
+    }
+  };
 
   // ── Navigation ──
   const [activeMenuItem, setActiveMenuItem] = useState('dashboard');
@@ -330,9 +340,10 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   };
 
   // ─── Form Submit Handlers ─────────────────────────────────────────────────
-
   const handleMessRebateSubmit = (data: MessRebateFormData) => {
     const submit = async () => {
+      showToast('Submitting your claim...', 'info');
+
       try {
         const formData = new FormData();
         formData.append('studentId', loggedInUser.studentId);
@@ -349,29 +360,44 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
         const result = await response.json();
 
         if (!response.ok) {
-          alert('Submission failed: ' + result.message);
+          showToast(result.message, 'error');
           return;
+        }
+
+        const claim = result.claim;
+
+        if (claim && claim.effectiveMessDays < claim.messAbsenceDays) {
+          showToast(
+            `Success! Note: You requested ${claim.messAbsenceDays} days, but you only have ${claim.effectiveMessDays} days left in your limit.`,
+            'warning',
+            8000
+          );
+        } else {
+          showToast('Mess rebate submitted successfully!', 'success');
         }
 
         setShowMessRebateForm(false);
         setSuccessClaimData({
-          claimId: result.claim.claimId,
+          claimId: claim.claimId,
           type: 'Mess Rebate',
-          amount: result.claim.amount,
+          amount: claim.effectiveAmount || claim.amount,
           fromDate: data.fromDate,
           toDate: data.toDate,
-          submissionDate: new Date(result.claim.createdAt),
+          submissionDate: new Date(claim.createdAt),
         });
         setShowSuccessConfirmation(true);
+
       } catch (error) {
         console.error('Error submitting mess rebate:', error);
-        alert('Could not connect to the server.');
+        showToast('Could not connect to the server. Please check your internet.', 'error');
       }
     };
+    
     submit();
   };
 
   const handleFestReimbursementSubmit = async (data: FestReimbursementFormData) => {
+    showToast('Submitting fest claim...', 'info');
     try {
       const formData = new FormData();
       formData.append('studentId', loggedInUser.studentId);
@@ -392,6 +418,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       const result = await response.json();
 
       if (response.ok) {
+        showToast('Fest claim submitted successfully!', 'success');
         setShowFestReimbursementForm(false);
         setFestClaimData({
           claimId: result.claim.claimId,
@@ -402,15 +429,16 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
         });
         setShowFestClaimSuccess(true);
       } else {
-        alert('Submission failed: ' + result.message);
+        showToast(result.message, 'error');
       }
     } catch (error) {
       console.error('Error submitting claim:', error);
-      alert('Could not connect to the server.');
+      showToast('Could not connect to the server.', 'error');
     }
   };
 
   const handleMedicalRebateSubmit = async (data: MedicalRebateFormData) => {
+    showToast('Submitting medical claim...', 'info');
     try {
       const formData = new FormData();
       formData.append('studentId', loggedInUser.studentId);
@@ -433,10 +461,11 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       }
 
       if (!response.ok) {
-        alert('Submission failed: ' + (result?.message || `HTTP ${response.status}`));
+        showToast(result?.message || `HTTP ${response.status}`, 'error');
         return;
       }
 
+      showToast('Medical rebate submitted successfully!', 'success');
       setShowMedicalRebateForm(false);
       setSuccessClaimData({
         claimId: result.claim.claimId,
@@ -447,7 +476,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       setShowSuccessConfirmation(true);
     } catch (error) {
       console.error('Error submitting medical rebate:', error);
-      alert('Upload failed. Please retry with a stable connection.');
+      showToast('Upload failed. Please retry with a stable connection.', 'error');
     }
   };
 
@@ -465,13 +494,41 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar
-          The Sidebar receives userRole (effectiveRole) and shows "Manage Team"
-          and "Approve Reimbursements" menu items only when userRole is
-          FEST_COORDINATOR or COORDINATOR. Sub-coordinators and regular students
-          don't see those menu items at all. */}
+ return (
+    <div className="flex h-screen bg-gray-50 relative">
+      
+      {/* ─── CUSTOM TOAST UI ─── */}
+      {toastState && (
+        <div className="fixed top-6 right-6 z-[9999] animate-fade-in-down">
+          <div className={`
+            px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 max-w-sm border backdrop-blur-md
+            ${toastState.type === 'error' ? 'bg-red-50/90 border-red-200 text-red-700' : ''}
+            ${toastState.type === 'warning' ? 'bg-amber-50/90 border-amber-200 text-amber-700' : ''}
+            ${toastState.type === 'success' ? 'bg-green-50/90 border-green-200 text-green-700' : ''}
+            ${toastState.type === 'info' ? 'bg-blue-50/90 border-blue-200 text-blue-700' : ''}
+          `}>
+            <div className="text-lg">
+              {toastState.type === 'error' && '❌'}
+              {toastState.type === 'warning' && '⚠️'}
+              {toastState.type === 'success' && '✅'}
+              {toastState.type === 'info' && '⏳'}
+            </div>
+            
+            <p className="text-sm font-semibold flex-1 leading-snug">
+              {toastState.message}
+            </p>
+            
+            <button 
+              onClick={() => setToastState(null)} 
+              className="ml-2 text-current opacity-50 hover:opacity-100 transition-opacity"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SIDEBAR ─── */}
       <Sidebar
         activeItem={activeMenuItem}
         onItemClick={setActiveMenuItem}
@@ -639,6 +696,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
         onNext={handleCategorySelect}
         isFestMember={isFestMember}
         settings={adminSettings}
+        showToast={showToast}
       />
       <MessRebateForm
         isOpen={showMessRebateForm}
