@@ -435,7 +435,7 @@ function ApproveRefundPage(props: {
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Claim ID', 'Student', 'Dept', 'Account Number', 'IFSC', 'Amount', 'Action'].map((head) => (
-                    <th key={head} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    <th key={head} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {head}
                     </th>
                   ))}
@@ -444,21 +444,21 @@ function ApproveRefundPage(props: {
               <tbody className="divide-y divide-slate-100">
                 {filteredPending.map((claim) => (
                   <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
+                    <td className="px-4 py-4 text-center">
                       <p className="font-semibold text-slate-700 text-sm">{claim.studentName}</p>
                       <p className="text-xs text-slate-400">{claim.studentRoll} · {claim.studentEmail}</p>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${deptBadge[claim.department] ?? ''}`}>
                         {deptLabel[claim.department] ?? claim.department}
                       </span>
                     </td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">{claim.accountNumber || '—'}</td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">{claim.ifscCode || '—'}</td>
-                    <td className="px-4 py-4 font-black text-emerald-700 whitespace-nowrap">₹{claim.amount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-600 whitespace-nowrap">{claim.accountNumber || '—'}</td>
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-600 whitespace-nowrap">{claim.ifscCode || '—'}</td>
+                    <td className="px-4 py-4 text-center font-black text-emerald-700 whitespace-nowrap">₹{claim.amount.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => { setProcessingId(claim._id); onMarkClaimRefunded(claim._id); }}
                           disabled={processingId === claim._id}
@@ -556,7 +556,7 @@ function ApproveRefundPage(props: {
                   <thead>
                     <tr className="border-b border-slate-100">
                       {['Student', 'Account Number', 'IFSC', 'Amount'].map((head) => (
-                        <th key={head} className="text-left py-2 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                        <th key={head} className="py-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                           {head}
                         </th>
                       ))}
@@ -565,13 +565,13 @@ function ApproveRefundPage(props: {
                   <tbody className="divide-y divide-slate-100">
                     {batch.claims.map((claim) => (
                       <tr key={claim._id}>
-                        <td className="py-3">
+                        <td className="py-3 text-center">
                           <p className="text-sm font-semibold text-slate-700">{claim.studentName}</p>
                           <p className="text-xs text-slate-400">{claim.studentRoll}</p>
                         </td>
-                        <td className="py-3 font-mono text-xs text-slate-600">{claim.accountNumber || '—'}</td>
-                        <td className="py-3 font-mono text-xs text-slate-600">{claim.ifscCode || '—'}</td>
-                        <td className="py-3 font-bold text-slate-700">₹{claim.amount.toLocaleString('en-IN')}</td>
+                        <td className="py-3 text-center font-mono text-xs text-slate-600">{claim.accountNumber || '—'}</td>
+                        <td className="py-3 text-center font-mono text-xs text-slate-600">{claim.ifscCode || '—'}</td>
+                        <td className="py-3 text-center font-bold text-slate-700">₹{claim.amount.toLocaleString('en-IN')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -688,7 +688,7 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Claim ID', 'Student', 'Dept', 'Amount', 'Batch/Ref', 'Refunded On'].map((head) => (
-                    <th key={head} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    <th key={head} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {head}
                     </th>
                   ))}
@@ -697,19 +697,19 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((row) => (
                   <tr key={row._id} className="hover:bg-slate-50">
-                    <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{row.claimId}</td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{row.claimId}</td>
+                    <td className="px-4 py-4 text-center">
                       <p className="font-semibold text-slate-700 text-sm">{row.studentName}</p>
                       <p className="text-xs text-slate-400">{row.studentRoll}</p>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${deptBadge[row.department] ?? ''}`}>
                         {deptLabel[row.department] ?? row.department}
                       </span>
                     </td>
-                    <td className="px-4 py-4 font-black text-emerald-700 whitespace-nowrap">₹{row.amount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{row.transactionRef}</td>
-                    <td className="px-4 py-4 text-xs text-slate-400 whitespace-nowrap">{new Date(row.refundedAt).toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-4 text-center font-black text-emerald-700 whitespace-nowrap">₹{row.amount.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{row.transactionRef}</td>
+                    <td className="px-4 py-4 text-center text-xs text-slate-400 whitespace-nowrap">{new Date(row.refundedAt).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>

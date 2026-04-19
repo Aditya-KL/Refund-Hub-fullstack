@@ -414,7 +414,7 @@ function ManageSecretariesModal({ onClose }: { onClose: () => void }) {
                 <thead className="sticky top-0 bg-slate-800/95">
                   <tr className="border-b border-slate-700">
                     {['Name & ID', 'Department', 'Contact', 'Last Login', 'Status', ''].map(h => (
-                      <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                      <th key={h} className="py-3 px-4 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -436,29 +436,29 @@ function ManageSecretariesModal({ onClose }: { onClose: () => void }) {
                     </tr>
                   ) : filtered.map(s => (
                     <tr key={s._id} className="border-b border-slate-700/40 hover:bg-slate-700/20 transition-colors">
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <p className="font-semibold text-white text-sm">{s.fullName}</p>
                         <p className="text-slate-500 text-xs mt-0.5">{s.studentId}</p>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${deptColor[s.department] || deptColor.mess}`}>
                           {deptLabelFull[s.department] || s.department}
                         </span>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <p className="text-slate-300 text-xs">{s.email}</p>
                         <p className="text-slate-500 text-xs mt-0.5">{s.phone}</p>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <p className="text-slate-400 text-xs">{getTimeAgo(s.lastLogin)}</p>
                       </td>
-                      <td className="py-4 px-4">
-                        <span className={`text-xs flex items-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                      <td className="py-4 px-4 text-center">
+                        <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
                           <Circle size={6} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
                           {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-4 px-4 text-center">
                         <button
                           onClick={() => setDeleteConfirm(s._id)}
                           className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
@@ -1194,7 +1194,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                       <thead>
                         <tr className="border-b border-slate-700">
                           {['Admin Name', 'Department', 'Status', 'Last Login'].map(h => (
-                            <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                            <th key={h} className="py-2.5 px-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -1216,22 +1216,22 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                           </tr>
                         ) : secretaries.map(s => (
                           <tr key={s._id} className="border-b border-slate-700/40 hover:bg-slate-700/20 transition-colors">
-                            <td className="py-3.5 px-3">
+                            <td className="py-3.5 px-3 text-center">
                               <p className="font-semibold text-white text-sm">{s.fullName}</p>
                               <p className="text-slate-500 text-xs">{s.studentId}</p>
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-3.5 px-3 text-center">
                               <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${deptColor[s.department] || deptColor.mess}`}>
                                 {deptLabelFull[s.department] || s.department}
                               </span>
                             </td>
-                            <td className="py-3.5 px-3">
-                              <span className={`text-xs flex items-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                            <td className="py-3.5 px-3 text-center">
+                              <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
                                 <Circle size={6} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
                                 {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                               </span>
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-3.5 px-3 text-center">
                               <p className="text-slate-400 text-xs">{getTimeAgo(s.lastLogin)}</p>
                             </td>
                           </tr>
@@ -1439,3 +1439,4 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     </div>
   );
 }
+

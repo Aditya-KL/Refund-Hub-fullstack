@@ -746,7 +746,7 @@ export function VerifyReimbursementView({
                     {['Ref ID', 'Student', 'Committee', 'Role', 'Amount', 'Date', 'Status', 'Action'].map(h => (
                       <th
                         key={h}
-                        className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap"
+                        className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap"
                       >
                         {h}
                       </th>
@@ -775,26 +775,30 @@ export function VerifyReimbursementView({
 
                     return (
                       <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
-                        <td className="px-4 py-3.5">
-                          <p className="font-semibold text-slate-700 text-sm">{claim.student.fullName}</p>
-                          <p className="text-xs text-slate-400">{claim.student.studentId}</p>
+                        <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
+                        <td className="px-4 py-3.5 text-center">
+                          <p className="font-semibold text-slate-700 text-sm text-center">{claim.student.fullName}</p>
+                          <p className="text-xs text-slate-400 text-center">{claim.student.studentId}</p>
                         </td>
-                        <td className="px-4 py-3.5 text-sm text-slate-600 whitespace-nowrap">{claim.claimantCommittee || 'General'}</td>
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <RoleBadge role={claim.claimantPosition} />
+                        <td className="px-4 py-3.5 text-center text-sm text-slate-600 whitespace-nowrap">{claim.claimantCommittee || 'General'}</td>
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex justify-center">
+                            <RoleBadge role={claim.claimantPosition} />
+                          </div>
                         </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap">
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
                           <span className="font-bold text-violet-700">Rs. {claim.amount.toLocaleString('en-IN')}</span>
                         </td>
-                        <td className="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">
+                        <td className="px-4 py-3.5 text-center text-xs text-slate-500 whitespace-nowrap">
                           {new Date(claim.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <StatusBadge status={claim.status} />
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex justify-center">
+                            <StatusBadge status={claim.status} />
+                          </div>
                         </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
                             {canReject && (
                               <button
                                 onClick={() => setRejectTargetId(claim._id)}
