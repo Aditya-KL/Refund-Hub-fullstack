@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Plus, DollarSign, Clock, CheckCircle, Home, FileText, User, Users, Shield } from 'lucide-react';
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -43,6 +43,35 @@ interface UserFest {
 
 interface StudentDashboardProps {
   onLogout: () => void;
+}
+
+const DASHBOARD_VIEWS = [
+  'dashboard',
+  'claims',
+  'refunds',
+  'history',
+  'manage-team',
+  'approve-reimbursement',
+  'profile',
+  'settings',
+] as const;
+
+type DashboardView = (typeof DASHBOARD_VIEWS)[number];
+
+function isDashboardView(value: string | null | undefined): value is DashboardView {
+  return !!value && DASHBOARD_VIEWS.includes(value as DashboardView);
+}
+
+function getViewFromUrl(): DashboardView | null {
+  const params = new URLSearchParams(window.location.search);
+  const viewParam = params.get('view');
+  return isDashboardView(viewParam) ? viewParam : null;
+}
+
+function buildUrlWithView(view: DashboardView): string {
+  const url = new URL(window.location.href);
+  url.searchParams.set('view', view);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 // ─── Bottom Nav Component (Mobile) ────────────────────────────────────────
@@ -101,8 +130,41 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   // ── Navigation ──
-  const [activeMenuItem, setActiveMenuItem] = useState('dashboard');
+  const [activeMenuItem, setActiveMenuItem] = useState<DashboardView>(() => {
+    if (typeof window === 'undefined') return 'dashboard';
+    const stateView = isDashboardView(window.history.state?.appView)
+      ? window.history.state.appView
+      : null;
+    const urlView = getViewFromUrl();
+    return stateView || urlView || 'dashboard';
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navigateTo = useCallback((nextView: string) => {
+    if (!isDashboardView(nextView)) return;
+
+    setActiveMenuItem(nextView);
+    setMobileMenuOpen(false);
+
+    const currentStateView = isDashboardView(window.history.state?.appView)
+      ? window.history.state.appView
+      : null;
+
+    if (currentStateView === nextView) {
+      window.history.replaceState(
+        { ...(window.history.state || {}), appView: nextView },
+        '',
+        buildUrlWithView(nextView),
+      );
+      return;
+    }
+
+    window.history.pushState(
+      { ...(window.history.state || {}), appView: nextView },
+      '',
+      buildUrlWithView(nextView),
+    );
+  }, []);
 
   // ── Modals & Forms ──
   const [showNewClaimModal, setShowNewClaimModal] = useState(false);
@@ -162,6 +224,38 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       }, new Map<string, UserFest>())
       .values()
   );
+
+  // Sync initial browser history state and restore the initial in-app view.
+  useEffect(() => {
+    const stateView = isDashboardView(window.history.state?.appView)
+      ? window.history.state.appView
+      : null;
+    const urlView = getViewFromUrl();
+    const initialView = stateView || urlView || 'dashboard';
+
+    window.history.replaceState(
+      { ...(window.history.state || {}), appView: initialView },
+      '',
+      buildUrlWithView(initialView),
+    );
+  }, []);
+
+  // Handle browser back/forward buttons for SPA navigation.
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const stateView = isDashboardView(event.state?.appView)
+        ? event.state.appView
+        : null;
+      const urlView = getViewFromUrl();
+      const nextView = stateView || urlView || 'dashboard';
+
+      setActiveMenuItem(nextView);
+      setMobileMenuOpen(false);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // ── Fetch Admin Settings ─────────────────────────────────────────────────
   useEffect(() => {
@@ -326,7 +420,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const handleTrackStatus = () => {
     setShowSuccessConfirmation(false);
     setShowFestClaimSuccess(false);
-    setActiveMenuItem('claims');
+    navigateTo('claims');
   };
 
   // ─── Form Submit Handlers ─────────────────────────────────────────────────
@@ -399,6 +493,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
           amount: data.expenseAmount,
           receiptsCount: data.receiptFiles.length,
           submissionDate: new Date(result.claim.createdAt),
+          status: result.claim.status || '',
         });
         setShowFestClaimSuccess(true);
       } else {
@@ -474,7 +569,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
           don't see those menu items at all. */}
       <Sidebar
         activeItem={activeMenuItem}
-        onItemClick={setActiveMenuItem}
+        onItemClick={navigateTo}
         userRole={effectiveRole}
         mobileOpen={mobileMenuOpen}
         onMobileToggle={() => setMobileMenuOpen(v => !v)}
@@ -537,7 +632,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     </div>
                   ) : (
                     dashboardClaims.slice(0, 4).map((claim) => (
-                      <ClaimStatusCard key={claim.id} claim={claim} onClick={() => setActiveMenuItem('claims')} />
+                      <ClaimStatusCard key={claim.id} claim={claim} onClick={() => navigateTo('claims')} />
                     ))
                   )}
                 </div>
@@ -612,12 +707,12 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
           {/* ── Profile ── */}
           {activeMenuItem === 'profile' && (
-            <ProfileView onEditClick={() => setActiveMenuItem('settings')} onLogout={onLogout} />
+            <ProfileView onEditClick={() => navigateTo('settings')} onLogout={onLogout} />
           )}
 
           {/* ── Settings ── */}
           {activeMenuItem === 'settings' && (
-            <EditProfile onBack={() => setActiveMenuItem('profile')} onLogout={onLogout} />
+            <EditProfile onBack={() => navigateTo('profile')} onLogout={onLogout} />
           )}
 
           {/* ── Fallback ── */}
@@ -687,7 +782,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       {/* Mobile Bottom Navigation */}
       <BottomNav 
         activeView={activeMenuItem} 
-        setActiveView={setActiveMenuItem}
+        setActiveView={navigateTo}
         userRole={effectiveRole}
       />
     </div>

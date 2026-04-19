@@ -592,24 +592,8 @@ async function approveClaim(req, res) {
     if (!approver)
       return res.status(403).json({ message: 'Insufficient permissions to approve claims.' });
 
-    let actorLabel = 'central admin';
+    let actorLabel = 'secretary/admin';
     let canApprove = !!(approver.isSuperAdmin || approver.isSecretary);
-
-    if (!canApprove && claim.requestType === 'FEST_REIMBURSEMENT' && claim.status === 'VERIFIED_FEST') {
-      const fcMembership = await FestMember.findOne({
-        user: approvedBy,
-        fest: claim.festId,
-        position: 'FEST_COORDINATOR',
-        isActive: true,
-      });
-      if (fcMembership) {
-        if (String(claim.student) === String(approvedBy)) {
-          return res.status(403).json({ message: 'You cannot approve your own claim.' });
-        }
-        canApprove = true;
-        actorLabel = 'fest coordinator';
-      }
-    }
 
     if (!canApprove)
       return res.status(403).json({ message: 'Insufficient permissions to approve claims.' });

@@ -297,13 +297,28 @@ async function submitFestClaim(req, res) {
           isActive: true,
         }).populate('fest');
 
-        if (memberships.length === 1) {
+        const fcMembership = memberships.find(m => m.position === 'FEST_COORDINATOR');
+        if (fcMembership) {
+          // If the student is an FC for this fest, always treat FC as the submitting role.
+          membership = fcMembership;
+        } else if (memberships.length === 1) {
           membership = memberships[0];
         } else if (memberships.length > 1) {
           return res.status(400).json({
             message: 'Please select the exact fest role before submitting this claim.',
           });
         }
+      }
+
+      // Safety: even when a specific memberId was provided, FC role must take precedence if available.
+      if (membership && membership.position !== 'FEST_COORDINATOR') {
+        const fcMembership = await FestMember.findOne({
+          user: user._id,
+          fest: festId,
+          position: 'FEST_COORDINATOR',
+          isActive: true,
+        }).populate('fest');
+        if (fcMembership) membership = fcMembership;
       }
 
       if (!membership) {
