@@ -324,7 +324,7 @@ function OverviewPage({ claims, dept }: { claims: Claim[]; dept: Department }) {
         <StatCard label="Total Claims"    value={stats.total}    icon={TrendingUp}  color={`bg-${dept === 'mess' ? 'emerald' : 'blue'}-100 text-${dept === 'mess' ? 'emerald' : 'blue'}-600`} />
         <StatCard label="Pending Review"  value={stats.pending}  icon={Clock}       color="bg-amber-100 text-amber-600" />
         <StatCard label="Approved"        value={stats.approved} icon={CheckCircle} color="bg-green-100 text-green-600" />
-        <StatCard label="Approved Value"  value={`â‚¹${(stats.totalAmt / 1000).toFixed(1)}K`} icon={DollarSign} color="bg-teal-100 text-teal-600" />
+        <StatCard label="Approved Value"  value={ `₹${(stats.totalAmt / 1000).toFixed(1)}K` } icon={DollarSign} color="bg-teal-100 text-teal-600" />
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
@@ -366,7 +366,7 @@ function OverviewPage({ claims, dept }: { claims: Claim[]; dept: Department }) {
                     </p>
                   </div>
                   <span className="font-bold text-slate-700 text-sm whitespace-nowrap">
-                    â‚¹{(c.effectiveAmount ?? c.amount).toLocaleString('en-IN')}
+                    ₹{(c.effectiveAmount ?? c.amount).toLocaleString('en-IN')}
                   </span>
                   <StatusBadge status={c.status} />
                 </div>
