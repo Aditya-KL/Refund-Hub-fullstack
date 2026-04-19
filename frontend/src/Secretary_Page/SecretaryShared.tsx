@@ -356,7 +356,7 @@ export function SecretaryLayout({
   }}
 >
   <div className="flex items-stretch h-16">
-    {navItems.slice(0, 4).map(item => {
+    {navItems.map(item => {
       const active = activeView === item.id;
       const Icon = item.icon;
 
@@ -986,60 +986,92 @@ export function SecretaryClaimsView({ department, secretary }: ClaimsListViewPro
           <p className="text-xs text-slate-300 mt-1">Try changing filters or refreshing</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {displayed.map(claim => {
-            const name = claim.student?.fullName || claim.studentName || '—';
-            const roll = claim.student?.studentId || claim.studentRoll || '—';
-            const date = claim.createdAt || claim.submittedAt || '';
-            const amount = claim.effectiveAmount ?? claim.amount;
-            const panelMode = getPanelMode(claim);
-            const isActionable = panelMode !== 'view';
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden w-full">
+          {/* 💻 Desktop/Tablet Header (Hidden on Mobile) */}
+          <div className="hidden sm:grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <div className="col-span-5">Student & Details</div>
+            <div className="col-span-3 text-center">Status</div>
+            <div className="col-span-2 text-right">Amount</div>
+            <div className="col-span-2 text-right">Action</div>
+          </div>
 
-            return (
-              <div
-                key={claim._id}
-                className={`bg-white border rounded-2xl p-4 transition-all ${isActionable ? 'border-slate-200 hover:border-slate-300 hover:shadow-sm cursor-pointer' : 'border-slate-100'}`}
-                onClick={() => setSelected(claim)}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-slate-100 text-slate-600">
-                    {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-bold text-gray-900">{name}</p>
-                      {isActionable && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: cfg.accentLight, color: cfg.accentDark }}>
-                          {panelMode === 'refund' ? 'Refund Pending' : 'Action Required'}
-                        </span>
-                      )}
+          {/* Table Body */}
+          <div className="divide-y divide-slate-100">
+            {displayed.map(claim => {
+              const name = claim.student?.fullName || claim.studentName || '—';
+              const roll = claim.student?.studentId || claim.studentRoll || '—';
+              const date = claim.createdAt || claim.submittedAt || '';
+              const amount = claim.effectiveAmount ?? claim.amount;
+              const panelMode = getPanelMode(claim);
+              const isActionable = panelMode !== 'view';
+
+              return (
+                <div
+                  key={claim._id}
+                  onClick={() => setSelected(claim)}
+                  className="p-4 sm:px-5 sm:py-4 hover:bg-slate-50 transition-colors cursor-pointer flex flex-col sm:grid sm:grid-cols-12 gap-3 sm:gap-4 sm:items-center w-full"
+                >
+                  {/* 📱 Mobile Top Row: Name and Amount */}
+                  <div className="flex justify-between items-start sm:hidden w-full gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-900 truncate">{name}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5 truncate">{roll}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 font-mono">{claim.claimId} · {roll}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</p>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-slate-900">₹{amount.toLocaleString()}</p>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <p className="text-base font-bold text-gray-900">₹{amount.toLocaleString()}</p>
+
+                  {/* 💻 Desktop Left Col / 📱 Mobile Middle Row: Details */}
+                  <div className="col-span-5 flex items-center gap-3 min-w-0 w-full">
+                    {/* Desktop Avatar */}
+                    <div className="hidden sm:flex w-9 h-9 rounded-full items-center justify-center text-xs font-bold shrink-0 bg-slate-100 text-slate-600">
+                      {name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="hidden sm:block text-sm font-bold text-slate-900 truncate">{name}</p>
+                      <p className="hidden sm:block text-xs text-slate-500 font-mono mt-0.5 truncate">{roll} • {claim.claimId}</p>
+                      
+                      {/* Mobile extra details */}
+                      <div className="sm:hidden flex items-center gap-2 text-[11px] text-slate-400 mt-1 truncate">
+                        <span>{claim.claimId}</span>
+                        {date && <span>• {new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 📱 Mobile Bottom Row: Status + Action */}
+                  <div className="flex sm:hidden justify-between items-center w-full mt-1 gap-3 overflow-hidden">
+                    <div className="shrink-0 max-w-[60%] overflow-x-auto no-scrollbar">
+                      <StatusBadge status={claim.status} />
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setSelected(claim); }}
+                      className="shrink-0 px-3 py-1.5 text-[11px] font-semibold rounded-lg border transition-colors flex items-center gap-1.5"
+                      style={isActionable
+                        ? { background: cfg.accentLight, color: cfg.accentDark, borderColor: cfg.accentLight }
+                        : { background: '#f8fafc', color: '#64748b', borderColor: '#e2e8f0' }
+                      }
+                    >
+                      <Eye size={12} /> {isActionable ? (panelMode === 'refund' ? 'Process' : 'Verify') : 'View'}
+                    </button>
+                  </div>
+
+                  {/* 💻 Desktop Remaining Cols */}
+                  <div className="hidden sm:flex col-span-3 justify-center overflow-hidden">
                     <StatusBadge status={claim.status} />
                   </div>
-                </div>
-
-                {claim.description && (
-                  <p className="text-xs text-gray-500 mt-2 line-clamp-1 leading-relaxed">{claim.description}</p>
-                )}
-
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    <FileText size={11} />
-                    {claim.attachments.length} document{claim.attachments.length !== 1 ? 's' : ''}
+                  
+                  <div className="hidden sm:block col-span-2 text-right">
+                    <p className="text-sm font-bold text-slate-900">₹{amount.toLocaleString()}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {(claim.status === 'REJECTED' || claim.status === 'rejected') && (
-                      <span className="text-xs text-red-500 font-medium flex items-center gap-1">
-                        <XCircle size={11} /> Rejected
-                      </span>
-                    )}
+                  
+                  <div className="hidden sm:flex col-span-2 justify-end">
                     <button
-                      onClick={e => { e.stopPropagation(); setSelected(claim); }}
+                      onClick={(e) => { e.stopPropagation(); setSelected(claim); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors"
                       style={isActionable
                         ? { background: cfg.accentLight, color: cfg.accentDark, borderColor: cfg.accentLight }
@@ -1049,10 +1081,11 @@ export function SecretaryClaimsView({ department, secretary }: ClaimsListViewPro
                       <Eye size={12} /> {isActionable ? (panelMode === 'refund' ? 'Process' : 'Verify') : 'View'}
                     </button>
                   </div>
+
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

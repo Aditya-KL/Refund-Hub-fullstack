@@ -25,7 +25,11 @@ export interface AdminSettings {
   maxMessRebateDays: number;          // max days allowed
   maxFileUploadMB: number;            // per-file limit
   autoApproveBelow: number;           // auto-approve threshold
-  portalActive: boolean;
+  messAdvanceNoticeDays: number;
+  medicalPastClaimDays: number;
+  messPortalActive: boolean;
+  festPortalActive: boolean;
+  hospitalPortalActive: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string;
   claimExpiryDays: number;
@@ -44,10 +48,14 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   messRebateRateDaily: 150,
   maxFestReimbursement: 5000,
   maxMedicalReimbursement: 10000,
+  messAdvanceNoticeDays: 3,
+  medicalPastClaimDays: 30,
   maxMessRebateDays: 30,
   maxFileUploadMB: 10,
-  autoApproveBelow: 500,
-  portalActive: true,
+  autoApproveBelow: 100,
+  messPortalActive: true,
+  festPortalActive: true,
+  hospitalPortalActive: true,
   maintenanceMode: false,
   maintenanceMessage: 'System is under maintenance. Please check back shortly.',
   claimExpiryDays: 90,
@@ -126,31 +134,32 @@ function DropZone({ onFiles, maxMB, id, error, accentColor = 'green' }: {
   return (
     <div>
       <div
+        onClick={() => document.getElementById(id)?.click()}
         onDragOver={e => { e.preventDefault(); setDrag(true); }}
         onDragLeave={e => { e.preventDefault(); setDrag(false); }}
         onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files) onFiles(e.dataTransfer.files); }}
-        className={`border-2 border-dashed rounded-2xl p-7 text-center transition-all duration-200
+        className={`cursor-pointer border-2 border-dashed rounded-2xl p-7 text-center transition-all duration-200
           ${drag ? `border-${accentColor}-500 bg-${accentColor}-50 scale-[1.01]`
             : error ? 'border-red-400 bg-red-50'
             : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'}`}
       >
-        <div className="flex flex-col items-center gap-2.5">
+        <div className="flex flex-col items-center gap-2.5 pointer-events-none">
           <div className={`w-12 h-12 rounded-full flex items-center justify-center
             ${drag ? `bg-${accentColor}-100` : 'bg-white shadow-sm'}`}>
             <Upload size={22} className={drag ? `text-${accentColor}-600` : 'text-gray-400'} />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-700">Drop files here or browse</p>
+            <p className="text-sm font-medium text-gray-700">Drop files here or click to browse</p>
             <p className="text-xs text-gray-400 mt-0.5">JPG · PNG · PDF — max {maxMB}MB each</p>
           </div>
           <input type="file" multiple accept="image/jpeg,image/jpg,image/png,application/pdf"
             onChange={e => e.target.files && onFiles(e.target.files)}
-            className="hidden" id={id} />
-          <label htmlFor={id}
-            className={`px-5 py-1.5 bg-${accentColor}-600 hover:bg-${accentColor}-700 text-white
-              text-sm rounded-lg font-medium cursor-pointer transition-colors`}>
+            // We keep pointer-events-auto here so the native input still works if directly clicked via label
+            className="hidden pointer-events-auto" id={id} />
+          {/* We can visually keep the button, but the whole box handles the click now */}
+          <span className={`px-5 py-1.5 bg-${accentColor}-600 text-white text-sm rounded-lg font-medium mt-1`}>
             Select Files
-          </label>
+          </span>
         </div>
       </div>
       {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
@@ -174,13 +183,20 @@ export function SelectCategoryModal({
   settings = DEFAULT_SETTINGS
 }: SelectCategoryModalProps) {
   const [selected, setSelected] = useState<string | null>(null);
-
+  const [portalError, setPortalError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (portalError) {
+      const timer = setTimeout(() => setPortalError(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [portalError]);
   if (!isOpen) return null;
 
   // Portal / maintenance guard
   if (settings.maintenanceMode) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
           <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -188,25 +204,6 @@ export function SelectCategoryModal({
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Portal Under Maintenance</h2>
           <p className="text-gray-600 text-sm">{settings.maintenanceMessage}</p>
-          <button onClick={onClose}
-            className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-medium text-sm">
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!settings.portalActive) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck size={32} className="text-red-600" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Portal Inactive</h2>
-          <p className="text-gray-600 text-sm">The claims portal is currently closed. Please check back later.</p>
           <button onClick={onClose}
             className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl font-medium text-sm">
             Close
@@ -271,9 +268,23 @@ export function SelectCategoryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setSelected(null); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+
+        {portalError && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-8 duration-300">
+          <div className="flex items-center gap-3 px-5 py-3 bg-gray-900 border border-gray-800 shadow-2xl shadow-red-500/20 rounded-full w-max max-w-[90vw]">
+            <div className="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+              <AlertTriangle size={14} className="text-red-400" />
+            </div>
+            <p className="text-sm font-medium text-white tracking-wide pr-2">
+              {portalError}
+            </p>
+          </div>
+        </div>
+      )}
+
         {/* Header */}
         <div className="px-6 pt-6 pb-5 border-b border-gray-100">
           <div className="flex items-start justify-between">
@@ -294,7 +305,11 @@ export function SelectCategoryModal({
             const c = colorMap[cat.color];
             const isSelected = selected === cat.id;
             return (
-              <button key={cat.id} onClick={() => setSelected(cat.id)}
+              <button key={cat.id} 
+                onClick={() => { 
+                  setSelected(cat.id); 
+                  setPortalError(null);
+                }}
                 className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-150
                   ${isSelected ? `ring-2 ${c.ring} border-transparent` : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}`}>
                 <div className="flex items-center gap-4">
@@ -332,13 +347,45 @@ export function SelectCategoryModal({
           )}
         </div>
 
+        {/* {portalError && (
+          <div className="px-5 pb-2">
+            <div className="flex items-center gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl animate-in fade-in slide-in-from-bottom-2">
+              <AlertTriangle size={18} className="text-red-600 flex-shrink-0" />
+              <p className="text-sm font-semibold text-red-800">{portalError}</p>
+            </div>
+          </div>
+        )} */}
+
         {/* Footer */}
         <div className="px-5 pb-5 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-          <button onClick={() => { setSelected(null); onClose(); }}
+          <button onClick={() => { setSelected(null); setPortalError(null); onClose(); }}
             className="px-5 py-2.5 text-sm text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">
             Cancel
           </button>
-          <button onClick={() => { if (selected) { onNext(selected); setSelected(null); } }}
+          
+          <button 
+            onClick={() => { 
+              if (selected) { 
+                // --- CHECK PORTAL SETTINGS BEFORE CONTINUING ---
+                if (selected === 'mess-rebate' && !settings.messPortalActive) {
+                  setPortalError('The Mess Claims portal is currently disabled.');
+                  return;
+                }
+                if (selected === 'fest-activity' && !settings.festPortalActive) {
+                  setPortalError('The Fest Reimbursements portal is currently disabled.');
+                  return;
+                }
+                if (selected === 'medical-rebate' && !settings.hospitalPortalActive) {
+                  setPortalError('The Medical Claims portal is currently disabled.');
+                  return;
+                }
+                
+                // If everything is open, proceed!
+                onNext(selected); 
+                setSelected(null); 
+                setPortalError(null);
+              } 
+            }}
             disabled={!selected}
             className="px-7 py-2.5 text-sm rounded-xl font-semibold transition-all
               disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed
@@ -370,7 +417,9 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
   if (!isOpen) return null;
 
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = format(tomorrow, 'yyyy-MM-dd');
+  const minDateObj = new Date(); 
+  minDateObj.setDate(minDateObj.getDate() + (settings.messAdvanceNoticeDays || 0));
+  const minDate = format(minDateObj, 'yyyy-MM-dd');
 
   const days = fromDate && toDate
     ? Math.ceil(Math.abs(toDate.getTime() - fromDate.getTime()) / 86400000) + 1 : 0;
@@ -403,7 +452,7 @@ export function MessRebateForm({ isOpen, onClose, onBack, onSubmit, settings = D
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { reset(); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -649,7 +698,7 @@ export function FestReimbursementForm({ isOpen, onClose, onBack, onSubmit, setti
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { reset(); onClose(); }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -843,6 +892,12 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
     return '';
   };
 
+  const maxDateObj = new Date();
+  const maxDate = format(maxDateObj, 'yyyy-MM-dd');
+  const minDateObj = new Date();
+  minDateObj.setDate(maxDateObj.getDate() - (settings.medicalPastClaimDays || 30));
+  const minDate = format(minDateObj, 'yyyy-MM-dd');
+
   const handleFiles = (fl: FileList) => {
     const maxBytes = settings.maxFileUploadMB * 1024 * 1024;
     const valid = Array.from(fl).filter(f => {
@@ -872,7 +927,7 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { if (!submitting) { reset(); onClose(); } }} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -919,7 +974,8 @@ export function MedicalRebateForm({ isOpen, onClose, onBack, onSubmit, settings 
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Treatment Date *</label>
               <input type="date" value={date ? format(date, 'yyyy-MM-dd') : ''}
-                max={format(new Date(), 'yyyy-MM-dd')}
+                min={minDate} 
+                max={maxDate}
                 onChange={e => { setDate(e.target.value ? new Date(e.target.value) : null); setErrors(p => ({ ...p, date: '' })); }}
                 className={`w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500 ${errors.date ? 'border-red-400' : 'border-gray-200'}`} />
               {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
@@ -1017,7 +1073,7 @@ export function FestClaimSuccess({ isOpen, onClose, onTrackStatus, onViewRecords
   const autoApproved = claimData.amount <= settings.autoApproveBelow;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-[95%] max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Top */}
@@ -1146,7 +1202,7 @@ export function SuccessConfirmation({ isOpen, onClose, onTrackStatus, claimData,
   const autoApproved = claimData.amount != null && claimData.amount <= settings.autoApproveBelow;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-[95%] max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="text-center pt-10 pb-6 px-6">

@@ -322,7 +322,7 @@ function ApproveRefundPage(props: {
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold disabled:opacity-50"
         >
           {exportLoading ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-          {exportLoading ? 'Exporting…' : `Download Excel/CSV (${pendingClaims.length})`}
+          {exportLoading ? 'Exporting…' : `Download CSV (${pendingClaims.length})`}
         </button>
       </div>
 
@@ -335,7 +335,7 @@ function ApproveRefundPage(props: {
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
         <p className="text-sm font-bold text-amber-900">Fresh export queue</p>
         <p className="text-xs text-amber-700 mt-1">
-          Export includes name, roll number, email, account number, IFSC code, and one total row per student even if they have multiple claims.
+          Export includes name, roll number, email, account number, IFSC code, and one total row per student.
         </p>
       </div>
 
@@ -351,7 +351,7 @@ function ApproveRefundPage(props: {
             <button
               key={dept}
               onClick={() => setDeptFilter(dept)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 ${
                 deptFilter === dept ? 'bg-amber-500 text-white' : 'bg-white border border-slate-200 text-slate-500'
               }`}
             >
@@ -361,14 +361,76 @@ function ApproveRefundPage(props: {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {filteredPending.length === 0 ? (
-          <div className="py-14 text-center text-slate-400">
-            <CheckCircle2 size={40} className="mx-auto mb-3 text-slate-200" />
-            <p className="font-semibold">No fresh claims waiting for export</p>
+      {/* ── Mobile cards ── */}
+      {filteredPending.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-14 text-center text-slate-400">
+          <CheckCircle2 size={40} className="mx-auto mb-3 text-slate-200" />
+          <p className="font-semibold">No fresh claims waiting for export</p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-3 lg:hidden">
+            {filteredPending.map((claim) => (
+              <div key={claim._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm flex-shrink-0">
+                    {claim.studentName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-slate-800">{claim.studentName}</p>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${deptBadge[claim.department] ?? ''}`}>
+                        {deptLabel[claim.department] ?? claim.department}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{claim.studentRoll}</p>
+                    <p className="text-xs text-slate-400 truncate">{claim.studentEmail}</p>
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-base font-black text-emerald-700">₹{claim.amount.toLocaleString('en-IN')}</p>
+                    <p className="text-xs font-mono text-slate-400 mt-0.5">{claim.claimId}</p>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">Account No.</p>
+                    <p className="text-xs font-mono font-bold text-slate-700 mt-0.5 break-all">{claim.accountNumber || '—'}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">IFSC</p>
+                    <p className="text-xs font-mono font-bold text-slate-700 mt-0.5">{claim.ifscCode || '—'}</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => { setProcessingId(claim._id); onMarkClaimRefunded(claim._id); }}
+                    disabled={processingId === claim._id}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl text-xs font-bold disabled:opacity-50 border border-green-200"
+                  >
+                    {processingId === claim._id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                    Refunded
+                  </button>
+                  <button
+                    onClick={() => { setProcessingId(claim._id); onRejectClaim(claim._id); }}
+                    disabled={processingId === claim._id}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold disabled:opacity-50 border border-red-200"
+                  >
+                    {processingId === claim._id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => setSelectedClaim(claim)}
+                    className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200"
+                  >
+                    <Eye size={13} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
+
+          {/* ── Desktop table ── */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
@@ -397,7 +459,7 @@ function ApproveRefundPage(props: {
                     <td className="px-4 py-4 font-black text-emerald-700 whitespace-nowrap">₹{claim.amount.toLocaleString('en-IN')}</td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
-                        <button 
+                        <button
                           onClick={() => { setProcessingId(claim._id); onMarkClaimRefunded(claim._id); }}
                           disabled={processingId === claim._id}
                           className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg disabled:opacity-50"
@@ -405,7 +467,7 @@ function ApproveRefundPage(props: {
                         >
                           {processingId === claim._id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                         </button>
-                        <button 
+                        <button
                           onClick={() => { setProcessingId(claim._id); onRejectClaim(claim._id); }}
                           disabled={processingId === claim._id}
                           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
@@ -423,9 +485,10 @@ function ApproveRefundPage(props: {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
+      {/* ── Under Process Batches ── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -462,7 +525,33 @@ function ApproveRefundPage(props: {
                 </button>
               </div>
 
-              <div className="mt-4 overflow-x-auto">
+              {/* Batch claims — mobile cards */}
+              <div className="mt-4 space-y-2 lg:hidden">
+                {batch.claims.map((claim) => (
+                  <div key={claim._id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-700">{claim.studentName}</p>
+                        <p className="text-xs text-slate-400">{claim.studentRoll}</p>
+                      </div>
+                      <p className="font-bold text-slate-700 flex-shrink-0 ml-2">₹{claim.amount.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <p className="text-xs text-slate-400">Account</p>
+                        <p className="text-xs font-mono text-slate-600">{claim.accountNumber || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400">IFSC</p>
+                        <p className="text-xs font-mono text-slate-600">{claim.ifscCode || '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Batch claims — desktop table */}
+              <div className="mt-4 hidden lg:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100">
@@ -533,7 +622,7 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
             <button
               key={dept}
               onClick={() => setDeptFilter(dept)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap ${
+              className={`px-3 py-2 rounded-xl text-xs font-semibold capitalize whitespace-nowrap flex-shrink-0 ${
                 deptFilter === dept ? 'bg-amber-500 text-white' : 'bg-white border border-slate-200 text-slate-500'
               }`}
             >
@@ -542,6 +631,7 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
           ))}
         </div>
       </div>
+
       <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center justify-between">
         <div>
           <p className="text-xs text-amber-600 font-semibold uppercase tracking-wider">Filtered Total</p>
@@ -552,11 +642,48 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
           <p className="text-xs text-amber-500 mt-0.5">{history.length} total</p>
         </div>
       </div>
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="py-14 text-center text-slate-400">No refund records found.</div>
-        ) : (
-          <div className="overflow-x-auto">
+
+      {filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-14 text-center text-slate-400">
+          No refund records found.
+        </div>
+      ) : (
+        <>
+          {/* ── Mobile cards ── */}
+          <div className="space-y-3 lg:hidden">
+            {filtered.map((row) => (
+              <div key={row._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm flex-shrink-0">
+                    {row.studentName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-slate-800">{row.studentName}</p>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${deptBadge[row.department] ?? ''}`}>
+                        {deptLabel[row.department] ?? row.department}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{row.studentRoll}</p>
+                    <p className="text-xs font-mono text-slate-400 mt-0.5">{row.claimId}</p>
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <p className="text-base font-black text-emerald-700">₹{row.amount.toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {new Date(row.refundedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wide">Batch / Ref</p>
+                  <p className="text-xs font-mono font-bold text-slate-700 mt-0.5">{row.transactionRef}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Desktop table ── */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <table className="w-full">
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
@@ -588,8 +715,8 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -672,10 +799,8 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
   useEffect(() => { loadClaims(); }, []);
   useEffect(() => { loadHistory(); }, []);
 
-  // ─── Heartbeat: Update secretary's lastLogin every 30 seconds ────────────────
   useEffect(() => {
     if (!user?._id) return;
-
     const sendHeartbeat = async () => {
       try {
         await fetch(`${BASE}/api/heartbeat/${user._id}`, { method: 'POST' });
@@ -683,9 +808,8 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
         console.error('Heartbeat error:', error);
       }
     };
-
-    sendHeartbeat(); // Send immediately on mount
-    const interval = setInterval(sendHeartbeat, 30000); // Then every 30 seconds
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 30000);
     return () => clearInterval(interval);
   }, [user?._id]);
 
@@ -699,10 +823,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
       const res = await fetch(`${BASE}/api/verify/accounts/export-batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          exportedBy: user._id,
-          exportedByName: user.fullName,
-        }),
+        body: JSON.stringify({ exportedBy: user._id, exportedByName: user.fullName }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to export batch.');
@@ -723,11 +844,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
       const res = await fetch(`${BASE}/api/verify/accounts/batches/${batchId}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          refundedBy: user._id,
-          refundedByName: user.fullName,
-          notes: '',
-        }),
+        body: JSON.stringify({ refundedBy: user._id, refundedByName: user.fullName, notes: '' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to mark batch refunded.');
@@ -746,11 +863,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
       const res = await fetch(`${BASE}/api/verify/claims/${claimId}/mark-refunded`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          refundedBy: user._id,
-          refundedByName: user.fullName,
-          notes: 'Marked as refunded by accounts secretary',
-        }),
+        body: JSON.stringify({ refundedBy: user._id, refundedByName: user.fullName, notes: 'Marked as refunded by accounts secretary' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to mark refunded.');
@@ -787,10 +900,10 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
   };
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: Home },
-    { id: 'approve', label: 'Approve Refunds', icon: CheckSquare },
-    { id: 'history', label: 'Refund History', icon: History },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'overview', label: 'Overview',        icon: Home },
+    { id: 'approve',  label: 'Approve Refunds', icon: CheckSquare },
+    { id: 'history',  label: 'Refund History',  icon: History },
+    { id: 'profile',  label: 'Profile',         icon: User },
   ];
 
   return (
@@ -809,7 +922,6 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
           ? <LoadingSpinner />
           : <OverviewPage pendingClaims={pendingClaims} underProcessBatches={underProcessBatches} history={history} />
       )}
-
       {activeView === 'approve' && (
         claimsLoading
           ? <LoadingSpinner />
@@ -829,7 +941,6 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
               setProcessingId={setProcessingId}
             />
       )}
-
       {activeView === 'history' && (
         historyLoading
           ? <LoadingSpinner />
@@ -837,7 +948,6 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
           ? <ErrorBlock message={historyError} onRetry={loadHistory} />
           : <RefundHistoryPage history={history} />
       )}
-
       {activeView === 'profile' && user && (
         <SecretaryProfileView
           user={user}

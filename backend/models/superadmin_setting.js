@@ -56,6 +56,8 @@ const ServerSettingsSchema = new mongoose.Schema({
   maxMedicalReimbursement:  { type: Number, default: 10000, min: 0 },
   maxAccountClaim:          { type: Number, default: 25000, min: 0 },
   maxMessRebateDays:        { type: Number, default: 30, min: 1, max: 180 },
+  messAdvanceNoticeDays:    { type: Number, default: 3, min: 0 },
+  medicalPastClaimDays:     { type: Number, default: 30, min: 1 },
   maxClaimsPerMonth:    { type: Number, default: 5, min: 1 },
   claimExpiryDays:      { type: Number, default: 90, min: 1 },
   maxFileUploadMB:      { type: Number, default: 10, min: 1, max: 100 },

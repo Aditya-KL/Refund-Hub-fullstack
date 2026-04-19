@@ -507,7 +507,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-sm w-full sm:w-auto"
                   >
                     <Plus size={20} />
-                    New Mess/Fest Rebate
+                    Apply For Rebate
                   </button>
                 </div>
               </div>
@@ -536,7 +536,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                       You haven't submitted any claims yet.
                     </div>
                   ) : (
-                    dashboardClaims.map((claim) => (
+                    dashboardClaims.slice(0, 4).map((claim) => (
                       <ClaimStatusCard key={claim.id} claim={claim} onClick={() => setActiveMenuItem('claims')} />
                     ))
                   )}
@@ -546,8 +546,8 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
               <div className="mt-8 bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
                 <p className="text-sm text-gray-600">
                   Need help? Contact support at{' '}
-                  <a href="mailto:support@refundhub.edu" className="text-green-600 hover:text-green-700 font-medium">
-                    support@refundhub.edu
+                  <a href="mailto:refundhub.verify@gmail.com" className="text-green-600 hover:text-green-700 font-medium">
+                    refundhub.verify@gmail.com
                   </a>{' '}
                   or visit the admin office
                 </p>
@@ -573,13 +573,14 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
               Coordinator sees only Coordinator and Sub-Coordinator columns.
               Both can add members (FC can add Coord + SubCoord, Coord can add only SubCoord).
               Both can remove members strictly below their own rank. */}
+          {/* ── Manage Team ── */}
           {activeMenuItem === 'manage-team' && effectiveRole && managementFests.length > 0 && (
             <ManageTeamView
-              currentUserPosition={effectiveRole}
               userFests={managementFests.map(f => ({
                 _id: f.festId,
                 festName: f.festName,
                 academicYear: f.academicYear,
+                userRole: f.position 
               }))}
               currentUserId={loggedInUser._id}
               currentUserRollNo={loggedInUser.studentId}

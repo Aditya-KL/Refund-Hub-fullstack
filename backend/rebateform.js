@@ -96,20 +96,11 @@ const getUploadErrorMessage = (err) => {
 
 async function checkPortalGuard(portalType) {
   const settings = await ServerSettings.getSettings();
-  
-  if (settings.maintenanceMode) {
-    return { blocked: true, message: settings.maintenanceMessage || 'System is under maintenance.' };
-  }
+  if (settings.maintenanceMode) return { blocked: true, message: settings.maintenanceMessage || 'System is under maintenance.' };
 
-  if (portalType === 'MESS' && !settings.messPortalActive) {
-    return { blocked: true, message: 'The Mess Claims portal is currently disabled.' };
-  }
-  if (portalType === 'FEST' && !settings.festPortalActive) {
-    return { blocked: true, message: 'The Fest Reimbursements portal is currently disabled.' };
-  }
-  if (portalType === 'HOSPITAL' && !settings.hospitalPortalActive) {
-    return { blocked: true, message: 'The Medical Claims portal is currently disabled.' };
-  }
+  if (portalType === 'MESS' && !settings.messPortalActive) return { blocked: true, message: 'The Mess Claims portal is currently disabled.' };
+  if (portalType === 'FEST' && !settings.festPortalActive) return { blocked: true, message: 'The Fest Reimbursements portal is currently disabled.' };
+  if (portalType === 'HOSPITAL' && !settings.hospitalPortalActive) return { blocked: true, message: 'The Medical Claims portal is currently disabled.' };
 
   return { blocked: false, settings };
 }
@@ -184,6 +175,15 @@ async function submitMessRebate(req, res) {
 
       const absenceFrom = fromDate ? new Date(fromDate) : null;
       const absenceTo = toDate ? new Date(toDate) : null;
+
+      // --- NEW MESS TIMELINE CHECK ---
+      const minFromDate = new Date();
+      minFromDate.setHours(0, 0, 0, 0); // Start of today
+      minFromDate.setDate(minFromDate.getDate() + (settings.messAdvanceNoticeDays || 0));
+
+      if (absenceFrom && absenceFrom < minFromDate) {
+        return res.status(400).json({ message: `Mess rebates require at least ${settings.messAdvanceNoticeDays} days advance notice.` });
+      }
 
       if (!absenceFrom || isNaN(absenceFrom.getTime()))
         return res.status(400).json({ message: 'Valid from date is required.' });
@@ -418,6 +418,21 @@ async function submitMedicalRebate(req, res) {
       const treatmentDateParsed = treatmentDate ? new Date(treatmentDate) : null;
       if (!treatmentDateParsed || isNaN(treatmentDateParsed.getTime()))
         return res.status(400).json({ message: 'Valid treatment date is required.' });
+
+      // --- NEW MEDICAL TIMELINE CHECK ---
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // End of today
+
+      const oldestAllowedDate = new Date();
+      oldestAllowedDate.setHours(0, 0, 0, 0);
+      oldestAllowedDate.setDate(oldestAllowedDate.getDate() - (settings.medicalPastClaimDays || 30));
+
+      if (treatmentDateParsed > today) {
+        return res.status(400).json({ message: 'Treatment date cannot be in the future.' });
+      }
+      if (treatmentDateParsed < oldestAllowedDate) {
+        return res.status(400).json({ message: `Medical claims must be submitted within ${settings.medicalPastClaimDays} days of treatment.` });
+      }
 
       const parsedAmount = Number(amount);
       if (!parsedAmount || parsedAmount <= 0)

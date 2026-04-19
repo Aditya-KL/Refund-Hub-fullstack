@@ -898,6 +898,26 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
     },
   ];
 
+  const refundedDeptData = [
+    {
+      name: 'Mess',
+      value: allClaims.filter(c => c.requestType === 'MESS_REBATE' && c.status === 'REFUNDED')
+                      .reduce((sum, c) => sum + Number(c.disbursedAmount || c.effectiveAmount || c.amount || 0), 0),
+      color: '#10b981',
+    },
+    {
+      name: 'Medical',
+      value: allClaims.filter(c => c.requestType === 'MEDICAL_REBATE' && c.status === 'REFUNDED')
+                      .reduce((sum, c) => sum + Number(c.disbursedAmount || c.effectiveAmount || c.amount || 0), 0),
+      color: '#3b82f6',
+    },
+    {
+      name: 'Cultural',
+      value: allClaims.filter(c => c.requestType === 'FEST_REIMBURSEMENT' && c.status === 'REFUNDED')
+                      .reduce((sum, c) => sum + Number(c.disbursedAmount || c.effectiveAmount || c.amount || 0), 0),
+      color: '#8b5cf6',
+    },
+  ];
   const centralQueueLabel: Record<AdminClaim['status'], string> = {
     VERIFIED_MESS: 'Mess Verified',
     VERIFIED_FEST: 'Fest Verified',
@@ -1145,27 +1165,63 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
                 {/* Pie Chart */}
                 <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 sm:p-5">
-                  <h2 className="text-base sm:text-lg font-bold text-white mb-0.5">Dept. Breakdown</h2>
-                  <p className="text-xs text-slate-400 mb-3">Pending claims by department</p>
+                  <h2 className="text-base sm:text-lg font-bold text-white mb-0.5">Refund Breakdown</h2>
+                  <p className="text-xs text-slate-400 mb-3">Total amount disbursed by department</p>
+                  
                   <ResponsiveContainer width="100%" height={190}>
-                    <PieChart>
-                      <Pie data={pendingDeptData} cx="50%" cy="50%" outerRadius={70} dataKey="value" labelLine={false}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                        {pendingDeptData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    <PieChart style={{ outline: 'none' }}>
+                      <Pie 
+                        data={refundedDeptData} 
+                        cx="50%" cy="50%" 
+                        // 1. Reduced outerRadius from 70 to 55 to give labels more room to breathe
+                        outerRadius={55} 
+                        dataKey="value" 
+                        labelLine={false}
+                        // 2. Added outline: 'none' to stop the weird box from appearing on click
+                        style={{ outline: 'none' }}
+                        label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                      >
+                        {refundedDeptData.map((entry, i) => (
+                          <Cell 
+                            key={i} 
+                            fill={entry.color} 
+                            style={{ outline: 'none' }} // 3. Also removes focus ring from individual slices
+                          />
+                        ))}
                       </Pie>
-                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff', fontSize: '11px' }} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
-                    {pendingDeptData.map(d => (
-                      <div key={d.name} className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-                          <span className="text-xs text-slate-300">{d.name}</span>
+
+                  {/* NEW: Amount Refunded Breakdown */}
+                  <div className="mt-4 pt-4 border-t border-slate-700">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Amount Refunded</h3>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {refundedDeptData.map(d => (
+                        <div key={d.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                            <span className="text-sm text-slate-300">{d.name}</span>
+                          </div>
+                          <span className="text-sm font-bold text-white">₹{d.value.toLocaleString('en-IN')}</span>
                         </div>
-                        <span className="text-xs font-bold text-white">{d.value}</span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* EXISTING: Pending Claims Breakdown */}
+                  <div className="mt-5 pt-4 border-t border-slate-700">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Pending Claims (Count)</h3>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                      {pendingDeptData.map(d => (
+                        <div key={d.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                            <span className="text-sm text-slate-300">{d.name}</span>
+                          </div>
+                          <span className="text-sm font-bold text-white">{d.value}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -126,32 +126,36 @@ export function Sidebar({ activeItem, onItemClick, userRole, mobileOpen, onMobil
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {regularItems.map(item => (
-          <SidebarItem
-            key={item.id}
-            item={item}
-            isActive={activeItem === item.id}
-            onClick={() => { onItemClick(item.id); toggleMenu(); }}
-          />
-        ))}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-1">
+        {visibleItems
+          .filter(i => i.id !== 'profile')
+          .map((item, idx) => {
+            // Determine if we need to show the "Fest Management" label
+            const isFestItem = item.requiredRoles && item.requiredRoles.length > 0;
+            const prevItem = visibleItems.filter(i => i.id !== 'profile')[idx - 1];
+            const prevIsFest = prevItem?.requiredRoles && prevItem.requiredRoles.length > 0;
+            const showLabel = isFestItem && !prevIsFest;
 
-        {festManagementItems.length > 0 && (
-          <div className="pt-2 pb-1">
-            <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-              Fest Management
-            </p>
-          </div>
-        )}
-
-        {festManagementItems.map(item => (
-          <SidebarItem
-            key={item.id}
-            item={item}
-            isActive={activeItem === item.id}
-            onClick={() => { onItemClick(item.id); toggleMenu(); }}
-          />
-        ))}
+            return (
+              <div key={item.id}>
+                {showLabel && (
+                  <div className="pt-3 pb-1">
+                    <p className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      Fest Management
+                    </p>
+                  </div>
+                )}
+                <SidebarItem
+                  item={{
+                    ...item,
+                    label: item.id === 'approve-reimbursement' ? 'Verify Reimbursement' : item.label 
+                  }}
+                  isActive={activeItem === item.id}
+                  onClick={() => { onItemClick(item.id); toggleMenu(); }}
+                />
+              </div>
+            );
+          })}
       </nav>
 
       {/* Bottom: Profile */}

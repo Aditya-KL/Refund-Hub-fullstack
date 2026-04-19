@@ -32,6 +32,7 @@ interface Fest {
   _id: string;
   festName: string;
   academicYear: string;
+  userRole: Position;
 }
 
 interface StudentSearchResult {
@@ -43,7 +44,6 @@ interface StudentSearchResult {
 }
 
 interface ManageTeamViewProps {
-  currentUserPosition: Position;
   userFests: Fest[];
   currentUserId: string;
   currentUserRollNo: string;
@@ -80,7 +80,7 @@ function getAcademicYear(rollNo: string): number {
 
 function getEligiblePositions(rollNo: string): Position[] {
   const yr = getAcademicYear(rollNo);
-  if (yr === 3) return ['COORDINATOR', 'SUB_COORDINATOR'];
+  if (yr === 3) return ['COORDINATOR'];
   if (yr === 2) return ['SUB_COORDINATOR'];
   return [];
 }
@@ -149,6 +149,7 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
   const [selected, setSelected] = useState<StudentSearchResult | null>(null);
   const [position, setPosition] = useState<Position>('SUB_COORDINATOR');
   const [committee, setCommittee] = useState('');
+  const [committeeOpen, setCommitteeOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -296,11 +297,42 @@ function AddMemberModal({ onClose, onAdd, fest, currentUserPosition }: {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Committee</label>
-                <select value={committee} onChange={e => setCommittee(e.target.value)}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white text-gray-900">
-                  <option value="">Select committee...</option>
-                  {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <div className="relative">
+                  {/* Custom Dropdown Button */}
+                  <button
+                    type="button"
+                    onClick={() => setCommitteeOpen(!committeeOpen)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    <span className={committee ? "text-gray-900 font-medium" : "text-gray-500"}>
+                      {committee || "Select committee..."}
+                    </span>
+                    <ChevronDown size={15} className={`text-gray-400 transition-transform ${committeeOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {committeeOpen && (
+                    <>
+                      {/* Invisible overlay to close dropdown when clicking outside */}
+                      <div className="fixed inset-0 z-10" onClick={() => setCommitteeOpen(false)} />
+                      
+                      {/* Dropdown Menu (opens UPWARDS so it never forces the modal to scroll) */}
+                      <div className="absolute z-20 w-full mb-1 bottom-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
+                        {TEAM_OPTIONS.map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => { setCommittee(t); setCommitteeOpen(false); }}
+                            className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                              committee === t ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               {error && (
                 <div className="flex items-center gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
@@ -359,8 +391,9 @@ function RemoveConfirmDialog({ member, onConfirm, onCancel }: {
 type SortField = 'name' | 'roll' | 'position' | 'committee';
 type SortDir = 'asc' | 'desc';
 
-export function ManageTeamView({ currentUserPosition, userFests, currentUserId, currentUserRollNo }: ManageTeamViewProps) {
+export function ManageTeamView({ userFests, currentUserId, currentUserRollNo }: ManageTeamViewProps) {
   const [selectedFest, setSelectedFest] = useState<Fest | null>(userFests[0] || null);
+  const currentUserPosition = selectedFest?.userRole || 'SUB_COORDINATOR';
   const [members, setMembers] = useState<FestMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -422,9 +455,7 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
     else { setSortField(field); setSortDir('asc'); }
   };
 
-  const visiblePositions: Position[] = currentUserPosition === 'FEST_COORDINATOR'
-    ? ['FEST_COORDINATOR', 'COORDINATOR', 'SUB_COORDINATOR']
-    : ['COORDINATOR', 'SUB_COORDINATOR'];
+  const visiblePositions: Position[] = ['FEST_COORDINATOR', 'COORDINATOR', 'SUB_COORDINATOR'];
 
   const presentCommittees = Array.from(new Set(
     members.filter(m => visiblePositions.includes(m.position)).map(m => m.committee).filter(Boolean)
@@ -650,59 +681,57 @@ export function ManageTeamView({ currentUserPosition, userFests, currentUserId, 
             </div>
           </div>
 
-          {/* Mobile Card View */}
+          {/* Mobile Card View (Updated) */}
           <div className="md:hidden divide-y divide-gray-100">
             {filtered.map(member => {
               if (!member || !member.user) return null;
               const cfg = ROLE_CONFIG[member.position];
               const yr = getAcademicYear(member.user.studentId);
               return (
-                <div key={member._id} className="p-4 space-y-3 hover:bg-gray-50/60 transition-colors">
-                  {/* Header with avatar and name */}
-                  <div className="flex items-start gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${cfg.bg} ${cfg.color}`}>
-                      {initials(member.user.fullName)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{member.user.fullName}</p>
-                      <p className="text-xs text-gray-500">{member.user.email}</p>
-                    </div>
-                    {canRemoveMember(member) && (
-                      <button onClick={() => setRemoveTarget(member)}
-                        className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
-                        title="Remove member">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                <div key={member._id} className="p-4 flex gap-3 hover:bg-gray-50/60 transition-colors">
+                  {/* Avatar */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${cfg.bg} ${cfg.color} mt-0.5`}>
+                    {initials(member.user.fullName)}
                   </div>
 
-                  {/* Info grid */}
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    {/* Roll No */}
-                    <div>
-                      <p className="text-gray-400 font-medium mb-0.5">Roll No</p>
-                      <p className="font-mono text-gray-700">{member.user.studentId}</p>
-                      {yr > 0 && (
-                        <p className="text-gray-400 flex items-center gap-1 mt-0.5">
-                          <GraduationCap size={10} />{yrLabels[yr] ?? `${yr}th`} yr
-                        </p>
+                  {/* Content Stack */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    {/* Top Row: Name, Email & Delete */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{member.user.fullName}</p>
+                        <p className="text-xs text-gray-500 truncate">{member.user.email}</p>
+                      </div>
+                      {canRemoveMember(member) && (
+                        <button onClick={() => setRemoveTarget(member)}
+                          className="p-1.5 -mt-1 -mr-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
+                          title="Remove member">
+                          <Trash2 size={16} />
+                        </button>
                       )}
                     </div>
 
-                    {/* Role */}
-                    <div>
-                      <p className="text-gray-400 font-medium mb-0.5">Role</p>
-                      <div><RolePill role={member.position} /></div>
+                    {/* Middle Row: Roll No & Year */}
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="font-mono font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
+                        {member.user.studentId}
+                      </span>
+                      {yr > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-1 font-medium">
+                            <GraduationCap size={12} /> {yrLabels[yr] ?? `${yr}th`} yr
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Bottom Row: Pills */}
+                    <div className="flex flex-wrap gap-2 pt-0.5">
+                      <RolePill role={member.position} />
+                      {member.committee && <CommitteePill name={member.committee} />}
                     </div>
                   </div>
-
-                  {/* Committee */}
-                  {member.committee && (
-                    <div className="text-xs">
-                      <p className="text-gray-400 font-medium mb-0.5">Committee</p>
-                      <CommitteePill name={member.committee} />
-                    </div>
-                  )}
                 </div>
               );
             })}

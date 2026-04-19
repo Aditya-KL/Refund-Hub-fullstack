@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   CheckCircle2, XCircle, ChevronDown, Filter, Loader2,
-  Clock, ArrowUpRight, FileText, Crown, Shield, User,
+  Clock, ArrowUpRight, FileText, Crown, Shield, User, Search,
   AlertTriangle, Send, SortAsc, Info, Sparkles, BadgeCheck
 } from 'lucide-react';
 
@@ -405,6 +405,7 @@ export function VerifyReimbursementView({
   const [filterRole, setFilterRole] = useState<Position | 'ALL'>('ALL');
   const [filterStatus, setFilterStatus] = useState<ClaimStatus | 'ALL'>('ALL');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   // Modals
   const [verifyTarget, setVerifyTarget] = useState<FestClaim | null>(null);
@@ -495,6 +496,16 @@ export function VerifyReimbursementView({
     displayed = displayed.filter(c => c.claimantPosition === 'SUB_COORDINATOR');
   }
 
+  if (search.trim()) {
+    const q = search.toLowerCase();
+    displayed = displayed.filter(c =>
+      c.student.fullName.toLowerCase().includes(q) ||
+      c.student.studentId.toLowerCase().includes(q) ||
+      c.claimId.toLowerCase().includes(q) ||
+      (c.claimantCommittee || '').toLowerCase().includes(q)
+    );
+  }
+
   if (sortBy === 'amount') displayed = [...displayed].sort((a, b) => b.amount - a.amount);
   else if (sortBy === 'role') {
     const order: Record<Position, number> = { FEST_COORDINATOR: 0, COORDINATOR: 1, SUB_COORDINATOR: 2 };
@@ -516,10 +527,6 @@ export function VerifyReimbursementView({
   const availableRoleFilters: (Position | 'ALL')[] = currentUserPosition === 'FEST_COORDINATOR'
     ? ['ALL', 'COORDINATOR', 'SUB_COORDINATOR']
     : ['SUB_COORDINATOR'];
-
-  const filterableStatuses: (ClaimStatus | 'ALL')[] = [
-    'ALL', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_COORD', 'VERIFIED_FEST', 'APPROVED', 'REJECTED',
-  ];
 
   // Group claims by fest
   const festGroups = displayed.reduce((acc, c) => {
@@ -620,51 +627,54 @@ export function VerifyReimbursementView({
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-          <Filter size={12} /> Filter:
+      {/* Search & Filters */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-4 shadow-sm">
+        
+        {/* Search Bar */}
+        <div className="relative">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input 
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name, roll no, claim ID, or committee..."
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500" 
+          />
         </div>
 
-        {currentUserPosition === 'FEST_COORDINATOR' && availableRoleFilters.map(r => (
-          <button
-            key={r}
-            onClick={() => setFilterRole(r as any)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
-              filterRole === r ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {r === 'ALL' ? 'All Roles' : ROLE_CONFIG[r as Position].label}
-          </button>
-        ))}
+        {/* Filter and Sort Row */}
+        <div className="flex flex-wrap gap-4 items-center justify-between pt-1">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium mr-1">
+              <Filter size={12} /> Role:
+            </div>
 
-        <div className="w-px h-4 bg-gray-200 mx-1" />
+            {currentUserPosition === 'FEST_COORDINATOR' && availableRoleFilters.map(r => (
+              <button
+                key={r}
+                onClick={() => setFilterRole(r as any)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                  filterRole === r ? 'bg-gray-900 text-white border-gray-900' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                {r === 'ALL' ? 'All Roles' : ROLE_CONFIG[r as Position].label}
+              </button>
+            ))}
+          </div>
 
-        {filterableStatuses.map(s => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s as any)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
-              filterStatus === s ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {s === 'ALL' ? 'All Status' : STATUS_CONFIG[s as ClaimStatus]?.label || s}
-          </button>
-        ))}
-
-        <div className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-          <SortAsc size={12} />
-          {(['date', 'amount', 'role'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setSortBy(s)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                sortBy === s ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
-          ))}
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+            <SortAsc size={12} /> Sort by:
+            {(['date', 'amount', 'role'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setSortBy(s)}
+                className={`ml-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${
+                  sortBy === s ? 'bg-green-600 text-white border-green-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

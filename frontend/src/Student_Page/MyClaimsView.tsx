@@ -165,7 +165,8 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
           name="claim-filter"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value as 'ALL' | 'FEST_REIMBURSEMENT' | 'MESS_REBATE' | 'MEDICAL_REBATE')}
-          className="px-4 py-2.5 rounded-lg font-semibold text-sm border border-gray-300 bg-white text-gray-900 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all cursor-pointer"
+          // 🔥 ADDED: min-w-[220px], pl-4, and pr-10
+          className="min-w-[220px] pl-4 pr-10 py-2.5 rounded-lg font-semibold text-sm border border-gray-300 bg-white text-gray-900 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all cursor-pointer"
         >
           <option value="ALL">All Claims ({claims.length})</option>
           <option value="FEST_REIMBURSEMENT">Fest/Activity ({festCount})</option>
@@ -288,7 +289,7 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
           ✅ THE NEW DOCUMENT VIEWER MODAL
           ──────────────────────────────────────────────────────────────────────── */}
       {viewingReceipts && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black bg-opacity-20 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-full flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
             
             {/* Modal Header */}
@@ -351,7 +352,7 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
 
       {/* Claim Details Modal */}
       {viewingClaimDetails && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-20 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setViewingClaimDetails(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50 shrink-0">
@@ -465,7 +466,7 @@ export function MyClaimsView({ onViewRecords }: MyClaimsViewProps) {
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black bg-opacity-10 backdrop-blur-lg p-4">
+        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
