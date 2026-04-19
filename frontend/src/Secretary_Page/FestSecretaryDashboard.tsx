@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home, Users, CheckSquare, Archive, User,
   Plus, Trash2, Star, Music, Zap, Globe, Mic,
@@ -1117,6 +1117,7 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   const [festIdMap, setFestIdMap] = useState<Record<string, string>>({});
   const [fcLoading, setFcLoading] = useState(true);
   const [fcError, setFcError] = useState('');
+  const didLoadFestDataRef = useRef(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -1191,16 +1192,17 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   useEffect(() => {
-    const fetchFestData = async () => {
-      setFcLoading(true);
-      setFcError('');
+    const fetchFestData = async (showLoader = false) => {
+      if (showLoader && !didLoadFestDataRef.current) {
+        setFcLoading(true);
+      }
       try {
         const festRes = await fetch(`${BASE}/api/fests`);
         if (!festRes.ok) throw new Error('Failed to load fests from database.');
         const fests: { _id: string; name: string }[] = await festRes.json();
         const map: Record<string, string> = {};
         fests.forEach(f => { map[f.name] = f._id; });
-        setFestIdMap(map);
+        setFestIdMap(prev => JSON.stringify(prev) === JSON.stringify(map) ? prev : map);
 
         const fcRes = await fetch(`${BASE}/api/fest-members/fcs`);
         if (!fcRes.ok) throw new Error('Failed to load FC list from database.');
@@ -1217,18 +1219,22 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
           lastLogin: m.user.lastLogin || null,
           isActive: m.isActive,
         }));
-        setFcList(mapped);
+        setFcList(prev => JSON.stringify(prev) === JSON.stringify(mapped) ? prev : mapped);
+        setFcError('');
+        didLoadFestDataRef.current = true;
       } catch (e: any) {
         console.error('Fest data load error:', e);
         setFcError(e.message || 'Could not load FC data. Check your connection.');
       } finally {
-        setFcLoading(false);
+        if (showLoader) {
+          setFcLoading(false);
+        }
       }
     };
-    fetchFestData();
+    fetchFestData(true);
     
     // Auto-refresh fest coordinators every 15 seconds to show real-time online status
-    const interval = setInterval(fetchFestData, 15000);
+    const interval = setInterval(() => fetchFestData(false), 15000);
     return () => clearInterval(interval);
   }, []);
 

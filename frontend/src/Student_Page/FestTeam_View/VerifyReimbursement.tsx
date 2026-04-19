@@ -566,7 +566,7 @@ export function VerifyReimbursementView({
       )}
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
+        <div className="text-center lg:text-center">
           <h1 className="text-2xl font-bold text-gray-900">Verify Reimbursements</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             <RoleBadge role={currentUserPosition} />
@@ -803,7 +803,7 @@ export function VerifyReimbursementView({
                               <button
                                 onClick={() => setRejectTargetId(claim._id)}
                                 disabled={actionLoading === claim._id}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-60"
+                                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors disabled:opacity-60"
                               >
                                 <XCircle size={12} /> Reject
                               </button>
@@ -812,7 +812,7 @@ export function VerifyReimbursementView({
                               <button
                                 onClick={() => setVerifyTarget(claim)}
                                 disabled={actionLoading === claim._id}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors disabled:opacity-60"
+                                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors disabled:opacity-60"
                               >
                                 <BadgeCheck size={12} /> Verify
                               </button>

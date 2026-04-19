@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home, ClipboardList, Settings, TrendingUp, AlertCircle,
   DollarSign, Activity, Crown, LogOut, UserPlus, Circle,
@@ -755,6 +755,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   const [allClaims, setAllClaims] = useState<AdminClaim[]>([]);
   const [loadingClaims, setLoadingClaims] = useState(true);
   const [adminActionLoading, setAdminActionLoading] = useState<string | null>(null);
+  const didLoadSecretariesRef = useRef(false);
 
   const baseUrl = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
   const storedUser = (() => {
@@ -779,21 +780,31 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   };
 
   useEffect(() => {
-    const fetchSecretaries = async () => {
+    const fetchSecretaries = async (showLoader = false) => {
       try {
-        setLoadingSecretaries(true);
+        if (showLoader && !didLoadSecretariesRef.current) {
+          setLoadingSecretaries(true);
+        }
         const data = await apiService.getSecretaries();
-        setSecretaries(data);
+        setSecretaries(prev => {
+          const next = Array.isArray(data) ? data : [];
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+        didLoadSecretariesRef.current = true;
       } catch (error) {
         console.error("Error fetching secretaries:", error);
       } finally {
-        setLoadingSecretaries(false);
+        if (showLoader && !didLoadSecretariesRef.current) {
+          setLoadingSecretaries(false);
+        } else if (showLoader) {
+          setLoadingSecretaries(false);
+        }
       }
     };
-    fetchSecretaries();
+    fetchSecretaries(true);
     
     // Refresh secretaries every 15 seconds to show real-time online status
-    const interval = setInterval(fetchSecretaries, 15000);
+    const interval = setInterval(() => fetchSecretaries(false), 15000);
     return () => clearInterval(interval);
   }, []);
 
