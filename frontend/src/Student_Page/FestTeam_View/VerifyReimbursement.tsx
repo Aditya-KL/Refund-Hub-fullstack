@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-  CheckCircle2, XCircle, ChevronDown, Filter, Loader2,
-  Clock, ArrowUpRight, FileText, Crown, Shield, User, Search,
-  AlertTriangle, Send, SortAsc, Info, Sparkles, BadgeCheck
+  XCircle, ChevronDown, Filter, Loader2,
+  ArrowUpRight, FileText, Crown, Shield, User, Search,
+  AlertTriangle, SortAsc, Info, Sparkles, BadgeCheck
 } from 'lucide-react';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
@@ -81,11 +81,11 @@ const ROLE_CONFIG: Record<Position, { label: string; color: string; bg: string; 
 };
 
 const STATUS_CONFIG: Record<ClaimStatus, { label: string; color: string; bg: string; border: string; dot: string }> = {
-  PENDING_TEAM_COORD:  { label: 'Pending (Team Lead)',      color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
-  PENDING_COORD:       { label: 'Pending (Coordinator)',    color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
-  PENDING_FC:          { label: 'Pending (Fest Coord)',     color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200', dot: 'bg-violet-400' },
-  VERIFIED_COORD:      { label: 'Verified by Coordinator',  color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   dot: 'bg-blue-400'   },
-  VERIFIED_FEST:       { label: 'Verified by FC',           color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  dot: 'bg-green-500'  },
+  PENDING_TEAM_COORD:  { label: 'Pending',                  color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
+  PENDING_COORD:       { label: 'Pending',                  color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dot: 'bg-orange-400' },
+  PENDING_FC:          { label: 'Pending',                  color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200', dot: 'bg-violet-400' },
+  VERIFIED_COORD:      { label: 'Verified',                 color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   dot: 'bg-blue-400'   },
+  VERIFIED_FEST:       { label: 'Verified',                 color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  dot: 'bg-green-500'  },
   APPROVED:            { label: 'Approved',                 color: 'text-green-800',  bg: 'bg-green-100',  border: 'border-green-300',  dot: 'bg-green-600'  },
   REJECTED:            { label: 'Rejected',                 color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',    dot: 'bg-red-500'    },
   REFUNDED:            { label: 'Refunded',                 color: 'text-purple-700', bg: 'bg-purple-50',  border: 'border-purple-200', dot: 'bg-purple-500' },
@@ -242,24 +242,17 @@ function ClaimCard({
   loading: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const actorPosition = claim.actorPosition || currentUserPosition;
 
-  /**
-   * Verification eligibility:
-   * COORDINATOR → can verify SUB_COORDINATOR claims in PENDING_COORD
-   * FEST_COORDINATOR → can verify:
-   *   - COORDINATOR claims in PENDING_COORD (skip coord stage)
-   *   - Any claim in PENDING_FC (after coord verified sub-coord)
-   * Anyone can reject if claim is not already terminal
-   */
   const canVerify = (() => {
     if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_FEST'].includes(claim.status)) return false;
-    if (currentUserPosition === 'COORDINATOR') {
-      return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
+    if (actorPosition === 'COORDINATOR') {
+      return claim.claimantPosition === 'SUB_COORDINATOR' && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status);
     }
-    if (currentUserPosition === 'FEST_COORDINATOR') {
+    if (actorPosition === 'FEST_COORDINATOR') {
       return (
-        (claim.claimantPosition === 'COORDINATOR' && ['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status)) ||
-        claim.status === 'PENDING_FC'
+        ['COORDINATOR', 'SUB_COORDINATOR'].includes(claim.claimantPosition) &&
+        ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)
       );
     }
     return false;
@@ -296,7 +289,10 @@ function ClaimCard({
         </div>
 
         {/* Description */}
-        <p className="text-xs text-gray-600 mt-3 line-clamp-2 leading-relaxed">{claim.description}</p>
+        <p className="text-xs text-gray-600 mt-3 line-clamp-2 leading-relaxed">
+          <span className="font-semibold text-gray-700">Description: </span>
+          {claim.description}
+        </p>
 
         {/* Transaction ID if present */}
         {claim.transactionId && (
@@ -400,10 +396,9 @@ export function VerifyReimbursementView({
 }: VerifyReimbursementViewProps) {
   const [claims, setClaims] = useState<FestClaim[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedFestId, setSelectedFestId] = useState<string>('ALL');
+  const [selectedFestId, setSelectedFestId] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'amount' | 'role'>('date');
   const [filterRole, setFilterRole] = useState<Position | 'ALL'>('ALL');
-  const [filterStatus, setFilterStatus] = useState<ClaimStatus | 'ALL'>('ALL');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -422,8 +417,11 @@ export function VerifyReimbursementView({
   };
 
   useEffect(() => {
-    if (userFests.length === 1) setSelectedFestId(userFests[0]._id);
-  }, [userFests]);
+    if (!userFests.length) return;
+    if (!selectedFestId || !userFests.some(f => f._id === selectedFestId)) {
+      setSelectedFestId(userFests[0]._id);
+    }
+  }, [userFests, selectedFestId]);
 
   useEffect(() => { fetchClaims(); }, [currentUserId]);
 
@@ -432,7 +430,7 @@ export function VerifyReimbursementView({
     setVerifyTarget(null);
     setActionLoading(claim._id);
     try {
-      const isFC = currentUserPosition === 'FEST_COORDINATOR';
+      const isFC = (claim.actorPosition || currentUserPosition) === 'FEST_COORDINATOR';
       const endpoint = isFC
         ? `/api/verify/fest/claims/${claim._id}/verify-fc`
         : `/api/verify/fest/claims/${claim._id}/verify-coord`;
@@ -446,13 +444,18 @@ export function VerifyReimbursementView({
           remarks,
         }),
       });
-      if (res.ok) {
-        const { claim: updated } = await res.json();
-        setClaims(prev => prev.map(c => c._id === updated._id
-          ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee, festName: c.festName }
-          : c
-        ));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || 'Failed to verify claim.');
       }
+
+      const { claim: updated } = await res.json();
+      setClaims(prev => prev.map(c => c._id === updated._id
+        ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee, festName: c.festName, actorPosition: c.actorPosition }
+        : c
+      ));
+    } catch (err: any) {
+      alert(err?.message || 'Failed to verify claim.');
     } finally {
       setActionLoading(null);
     }
@@ -463,6 +466,7 @@ export function VerifyReimbursementView({
     setRejectTargetId(null);
     setActionLoading(claimId);
     try {
+      const claim = claims.find(c => c._id === claimId);
       const res = await fetch(`${BASE_URL}/api/verify/claims/${claimId}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -470,13 +474,13 @@ export function VerifyReimbursementView({
           rejectedBy: currentUserId,
           rejectedByName: currentUserName,
           rejectionReason: reason,
-          stage: currentUserPosition,
+          stage: claim?.actorPosition || currentUserPosition,
         }),
       });
       if (res.ok) {
         const { claim: updated } = await res.json();
         setClaims(prev => prev.map(c => c._id === updated._id
-          ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee }
+          ? { ...c, ...updated, claimantPosition: c.claimantPosition, claimantCommittee: c.claimantCommittee, festName: c.festName, actorPosition: c.actorPosition }
           : c
         ));
       }
@@ -486,10 +490,12 @@ export function VerifyReimbursementView({
   };
 
   // ── Filtering & Sorting ──
+  const pendingStatuses: ClaimStatus[] = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'];
+
   let displayed = claims
-    .filter(c => selectedFestId === 'ALL' || c.festId === selectedFestId)
-    .filter(c => filterRole === 'ALL' || c.claimantPosition === filterRole)
-    .filter(c => filterStatus === 'ALL' || c.status === filterStatus);
+    .filter(c => pendingStatuses.includes(c.status))
+    .filter(c => selectedFestId ? c.festId === selectedFestId : false)
+    .filter(c => filterRole === 'ALL' || c.claimantPosition === filterRole);
 
   // Coordinators only see sub-coordinator claims
   if (currentUserPosition === 'COORDINATOR') {
@@ -511,7 +517,7 @@ export function VerifyReimbursementView({
     const order: Record<Position, number> = { FEST_COORDINATOR: 0, COORDINATOR: 1, SUB_COORDINATOR: 2 };
     displayed = [...displayed].sort((a, b) => order[a.claimantPosition] - order[b.claimantPosition]);
   } else {
-    displayed = [...displayed].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    displayed = [...displayed].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
 
   const pendingCount = claims.filter(c =>
@@ -542,7 +548,7 @@ export function VerifyReimbursementView({
       {verifyTarget && (
         <VerifyModal
           claim={verifyTarget}
-          actorPosition={currentUserPosition}
+          actorPosition={verifyTarget.actorPosition || currentUserPosition}
           onConfirm={(id, remarks) => handleVerify(verifyTarget, remarks)}
           onCancel={() => setVerifyTarget(null)}
         />
@@ -579,9 +585,9 @@ export function VerifyReimbursementView({
         <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <Info size={15} className="text-amber-600 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700">
-            <span className="font-semibold">As Fest Coordinator</span>, you can verify both Coordinator and Sub-Coordinator claims.
-            Coordinator claims can be verified directly by you — they skip the coordinator verification stage.
-            You can also reject any claim at any point.
+            <span className="font-semibold">As Fest Coordinator</span>, you can directly verify both Coordinator and Sub-Coordinator claims.
+            Any one verification is enough (Coordinator or Fest Coordinator).
+            Claims submitted by Fest Coordinators are auto-verified.
           </p>
         </div>
       )}
@@ -590,7 +596,7 @@ export function VerifyReimbursementView({
           <Info size={15} className="text-violet-600 shrink-0 mt-0.5" />
           <p className="text-xs text-violet-700">
             <span className="font-semibold">As Coordinator</span>, you can verify Sub-Coordinator claims.
-            After your verification, claims move to the Fest Coordinator for final verification.
+            Fest Coordinator can also verify the same pending claims directly.
           </p>
         </div>
       )}
@@ -617,7 +623,6 @@ export function VerifyReimbursementView({
             onChange={e => setSelectedFestId(e.target.value)}
             className="w-full sm:w-auto min-w-[240px] px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
           >
-            <option value="ALL">All Eligible Fests</option>
             {userFests.map(f => (
               <option key={f._id} value={f._id}>
                 {f.festName} ({f.academicYear})

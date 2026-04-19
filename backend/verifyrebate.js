@@ -156,10 +156,10 @@ async function getFestClaimsForActor(req, res) {
 
       if (position === 'FEST_COORDINATOR') {
         visiblePositions = ['COORDINATOR', 'SUB_COORDINATOR'];
-        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'];
+        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED', 'PUSHED_TO_ACCOUNTS'];
       } else if (position === 'COORDINATOR') {
         visiblePositions = ['SUB_COORDINATOR'];
-        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED', 'REJECTED'];
+        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'VERIFIED_FEST', 'APPROVED', 'PUSHED_TO_ACCOUNTS'];
       } else {
         continue;
       }
@@ -171,7 +171,7 @@ async function getFestClaimsForActor(req, res) {
         submitterFestPosition: { $in: visiblePositions },
       })
         .populate('student', 'fullName email studentId')
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: 1 });
 
       for (const claim of claims) {
         const claimCommittee = normalizeCommittee(claim.committeeName);
@@ -217,7 +217,7 @@ async function verifyFestClaimByCoord(req, res) {
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
     if (claim.requestType !== 'FEST_REIMBURSEMENT')
       return res.status(400).json({ message: 'Not a fest claim.' });
-    if (!['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status))
+    if (!['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status))
       return res.status(400).json({ message: `Cannot verify: claim is in status '${claim.status}'.` });
 
     const claimMembership = await getFestMembershipForClaim(claim);
@@ -248,7 +248,7 @@ async function verifyFestClaimByCoord(req, res) {
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
       {
-        $set: { status: 'PENDING_FC' },
+        $set: { status: 'VERIFIED_FEST' },
         $push: {
           verifications: {
             stage: 'COORDINATOR',
@@ -261,7 +261,7 @@ async function verifyFestClaimByCoord(req, res) {
             action: 'VERIFIED_BY_COORD',
             byUser: verifierId,
             byName: verifierName,
-            comments: remarks || 'Verified by Coordinator — forwarded to Fest Coordinator.',
+            comments: remarks || 'Verified by Coordinator — marked as fest verified.',
           },
         },
       },
@@ -274,7 +274,7 @@ async function verifyFestClaimByCoord(req, res) {
       action: 'APPROVE_CLAIM',
       targetCollection: 'claims',
       targetId: populated.claimId,
-      details: `Coordinator verified fest claim ${populated.claimId} for ${populated.student?.fullName || 'student'} and moved it to Fest Coordinator review.`,
+      details: `Coordinator verified fest claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
     });
 
     res.status(200).json({ message: 'Claim verified by Coordinator.', claim: populated });
@@ -300,7 +300,7 @@ async function verifyFestClaimByFC(req, res) {
     if (claim.requestType !== 'FEST_REIMBURSEMENT')
       return res.status(400).json({ message: 'Not a fest claim.' });
 
-    const allowedStatuses = ['PENDING_FC', 'PENDING_COORD', 'PENDING_TEAM_COORD'];
+    const allowedStatuses = ['PENDING', 'PENDING_FC', 'PENDING_COORD', 'PENDING_TEAM_COORD'];
     if (!allowedStatuses.includes(claim.status))
       return res.status(400).json({ message: `Cannot verify: claim is in status '${claim.status}'.` });
 
@@ -578,7 +578,29 @@ async function approveClaim(req, res) {
       });
 
     const approver = await User.findById(approvedBy);
-    if (!approver || (!approver.isSuperAdmin && !approver.isSecretary))
+    if (!approver)
+      return res.status(403).json({ message: 'Insufficient permissions to approve claims.' });
+
+    let actorLabel = 'central admin';
+    let canApprove = !!(approver.isSuperAdmin || approver.isSecretary);
+
+    if (!canApprove && claim.requestType === 'FEST_REIMBURSEMENT' && claim.status === 'VERIFIED_FEST') {
+      const fcMembership = await FestMember.findOne({
+        user: approvedBy,
+        fest: claim.festId,
+        position: 'FEST_COORDINATOR',
+        isActive: true,
+      });
+      if (fcMembership) {
+        if (String(claim.student) === String(approvedBy)) {
+          return res.status(403).json({ message: 'You cannot approve your own claim.' });
+        }
+        canApprove = true;
+        actorLabel = 'fest coordinator';
+      }
+    }
+
+    if (!canApprove)
       return res.status(403).json({ message: 'Insufficient permissions to approve claims.' });
 
     const populated = await RefundRequest.findByIdAndUpdate(
@@ -609,7 +631,7 @@ async function approveClaim(req, res) {
       action: 'APPROVE_CLAIM',
       targetCollection: 'claims',
       targetId: populated.claimId,
-      details: `Central admin approved claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
+      details: `${actorLabel} approved claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
     });
 
     res.status(200).json({ message: 'Claim approved.', claim: populated });
