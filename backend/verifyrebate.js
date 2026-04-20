@@ -173,10 +173,12 @@ async function getFestClaimsForActor(req, res) {
 
       if (position === 'FEST_COORDINATOR') {
         visiblePositions = ['COORDINATOR', 'SUB_COORDINATOR'];
-        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'];
+        // FROM CODE 2: Hide REJECTED/REFUNDED
+        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED', 'PUSHED_TO_ACCOUNTS'];
       } else if (position === 'COORDINATOR') {
         visiblePositions = ['SUB_COORDINATOR'];
-        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED', 'REJECTED'];
+        // FROM CODE 2: Hide REJECTED
+        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'VERIFIED_FEST', 'APPROVED', 'PUSHED_TO_ACCOUNTS'];
       } else {
         continue;
       }
@@ -188,16 +190,27 @@ async function getFestClaimsForActor(req, res) {
         submitterFestPosition: { $in: visiblePositions },
       })
         .populate('student', 'fullName email studentId')
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: 1 }); // FROM CODE 2: Oldest First
 
       for (const claim of claims) {
         const claimCommittee = normalizeCommittee(claim.committeeName);
+        
+        // FROM CODE 2: Check if Coord has already verified it
+        const hasCoordinatorVerification = Array.isArray(claim.verifications)
+          && claim.verifications.some((v) => v?.stage === 'COORDINATOR');
+          
         if (
           position === 'COORDINATOR' &&
           actorCommittee &&
           claimCommittee &&
           claimCommittee !== actorCommittee
         ) continue;
+        
+        // FROM CODE 2: Hide from FC if Coord already verified and it's pending
+        if (position === 'FEST_COORDINATOR' && hasCoordinatorVerification && ['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)) {
+          continue;
+        }
+        
         if (String(claim.student?._id) === String(actorId)) continue;
 
         results.push({
@@ -234,7 +247,9 @@ async function verifyFestClaimByCoord(req, res) {
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
     if (claim.requestType !== 'FEST_REIMBURSEMENT')
       return res.status(400).json({ message: 'Not a fest claim.' });
-    if (!['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status))
+      
+    // FROM CODE 2
+    if (!['PENDING', 'PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status))
       return res.status(400).json({ message: `Cannot verify: claim is in status '${claim.status}'.` });
 
     const claimMembership = await getFestMembershipForClaim(claim);
@@ -262,10 +277,11 @@ async function verifyFestClaimByCoord(req, res) {
     if (claimMembership.position !== 'SUB_COORDINATOR')
       return res.status(403).json({ message: 'Coordinator verification is only allowed for sub-coordinator claims in the same committee.' });
 
+    // FROM CODE 2: Skip FC, go straight to VERIFIED_FEST
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
       {
-        $set: { status: 'PENDING_FC' },
+        $set: { status: 'VERIFIED_FEST' },
         $push: {
           verifications: {
             stage: 'COORDINATOR',
@@ -278,7 +294,7 @@ async function verifyFestClaimByCoord(req, res) {
             action: 'VERIFIED_BY_COORD',
             byUser: verifierId,
             byName: verifierName,
-            comments: remarks || 'Verified by Coordinator — forwarded to Fest Coordinator.',
+            comments: remarks || 'Verified by Coordinator — marked as fest verified.',
           },
         },
       },
@@ -291,7 +307,7 @@ async function verifyFestClaimByCoord(req, res) {
       action: 'APPROVE_CLAIM',
       targetCollection: 'claims',
       targetId: populated.claimId,
-      details: `Coordinator verified fest claim ${populated.claimId} for ${populated.student?.fullName || 'student'} and moved it to Fest Coordinator review.`,
+      details: `Coordinator verified fest claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
     });
 
     res.status(200).json({ message: 'Claim verified by Coordinator.', claim: populated });
@@ -317,7 +333,8 @@ async function verifyFestClaimByFC(req, res) {
     if (claim.requestType !== 'FEST_REIMBURSEMENT')
       return res.status(400).json({ message: 'Not a fest claim.' });
 
-    const allowedStatuses = ['PENDING_FC', 'PENDING_COORD', 'PENDING_TEAM_COORD'];
+    // FROM CODE 2
+    const allowedStatuses = ['PENDING', 'PENDING_FC', 'PENDING_COORD', 'PENDING_TEAM_COORD'];
     if (!allowedStatuses.includes(claim.status))
       return res.status(400).json({ message: `Cannot verify: claim is in status '${claim.status}'.` });
 
@@ -339,6 +356,13 @@ async function verifyFestClaimByFC(req, res) {
 
     if (!['COORDINATOR', 'SUB_COORDINATOR'].includes(claimMembership.position))
       return res.status(403).json({ message: 'Fest Coordinators can only verify coordinator or sub-coordinator claims in the same fest.' });
+
+    // FROM CODE 2: Prevent FC from verifying if Coord already verified
+    const hasCoordinatorVerification = Array.isArray(claim.verifications)
+      && claim.verifications.some((v) => v?.stage === 'COORDINATOR');
+    if (hasCoordinatorVerification) {
+      return res.status(400).json({ message: 'This claim is already coordinator-verified and has been forwarded for Fest Secretary approval.' });
+    }
 
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
@@ -534,6 +558,7 @@ async function rejectClaim(req, res) {
     if (['REJECTED', 'REFUNDED'].includes(claim.status))
       return res.status(400).json({ message: `Claim is already ${claim.status.toLowerCase()}.` });
 
+    // FROM CODE 1: Proper clearing of Accounts logic on reject
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
       {
@@ -701,8 +726,15 @@ async function approveClaim(req, res) {
         message: `Claim must be in a verified state to approve. Current: '${claim.status}'.`,
       });
 
+    // FROM CODE 2: Label dynamic actor
     const approver = await User.findById(approvedBy);
-    if (!approver || (!approver.isSuperAdmin && !approver.isSecretary))
+    if (!approver)
+      return res.status(403).json({ message: 'Insufficient permissions to approve claims.' });
+
+    let actorLabel = 'secretary/admin';
+    let canApprove = !!(approver.isSuperAdmin || approver.isSecretary);
+
+    if (!canApprove)
       return res.status(403).json({ message: 'Insufficient permissions to approve claims.' });
 
     const populated = await RefundRequest.findByIdAndUpdate(
@@ -733,7 +765,7 @@ async function approveClaim(req, res) {
       action: 'APPROVE_CLAIM',
       targetCollection: 'claims',
       targetId: populated.claimId,
-      details: `Central admin approved claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
+      details: `${actorLabel} approved claim ${populated.claimId} for ${populated.student?.fullName || 'student'}.`,
     });
 
     res.status(200).json({ message: 'Claim approved.', claim: populated });
@@ -955,7 +987,7 @@ async function exportAccountsBatch(req, res) {
       if (!student?._id) continue;
 
       const key = String(student._id);
-      const bank = getUserBankDetails(student);
+      const bank = getUserBankDetails(student); // FROM CODE 1: Using the robust bank details helper
       const existing = grouped.get(key) || {
         batchId,
         studentId: key,
@@ -1039,6 +1071,7 @@ async function refundAccountsBatch(req, res) {
     const claims = await RefundRequest.find({ accountsBatchId: batchId, status: 'UNDER_PROCESS' });
     if (!claims.length) return res.status(404).json({ message: 'No under-process claims found for this batch.' });
 
+    // FROM CODE 1: Logic to hold claims during batch refund
     const validClaimIds = new Set(claims.map((claim) => String(claim._id)));
     const heldIds = Array.isArray(holdClaimIds)
       ? [...new Set(holdClaimIds.map((id) => String(id)).filter((id) => validClaimIds.has(id)))]
