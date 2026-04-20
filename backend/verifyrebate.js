@@ -152,15 +152,6 @@ async function checkPortalGuard() {
 }
 
 // ─── Fest claim: fetch all claims visible to an FC or Coordinator ──────────
-//
-// Visibility rules:
-//   COORDINATOR     → sees only PENDING claims from SUB_COORDINATORs in the same committee
-//   FEST_COORDINATOR → sees only PENDING claims from COORDINATORs (any committee in the fest)
-//
-// Once a claim is VERIFIED_FEST / APPROVED / PUSHED_TO_ACCOUNTS it is no longer
-// the actor's concern for action, so we only surface PENDING claims here.
-// History / read-only views can be handled by a separate admin endpoint.
-// ──────────────────────────────────────────────────────────────────────────
 async function getFestClaimsForActor(req, res) {
   try {
     const { actorId } = req.query;
@@ -177,15 +168,15 @@ async function getFestClaimsForActor(req, res) {
       const position = membership.position;
       const actorCommittee = normalizeCommittee(membership.committee);
 
-      // Each role only ever needs to act on PENDING claims.
-      // COORDINATOR  → acts on SUB_COORDINATOR claims
-      // FEST_COORDINATOR → acts on COORDINATOR claims
-      let targetPosition;
+      let visiblePositions = [];
+      let visibleStatuses = [];
 
       if (position === 'FEST_COORDINATOR') {
-        targetPosition = 'COORDINATOR';
+        visiblePositions = ['COORDINATOR', 'SUB_COORDINATOR'];
+        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED'];
       } else if (position === 'COORDINATOR') {
-        targetPosition = 'SUB_COORDINATOR';
+        visiblePositions = ['SUB_COORDINATOR'];
+        visibleStatuses = ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC', 'VERIFIED_FEST', 'APPROVED'];
       } else {
         continue;
       }
@@ -193,25 +184,32 @@ async function getFestClaimsForActor(req, res) {
       const claims = await RefundRequest.find({
         requestType: 'FEST_REIMBURSEMENT',
         festId,
-        status: 'PENDING',
-        submitterFestPosition: targetPosition,
+        status: { $in: visibleStatuses },
+        submitterFestPosition: { $in: visiblePositions },
       })
         .populate('student', 'fullName email studentId')
         .sort({ createdAt: 1 });
 
       for (const claim of claims) {
-        // Coordinators only see claims from their own committee
-        if (position === 'COORDINATOR') {
-          const claimCommittee = normalizeCommittee(claim.committeeName);
-          if (actorCommittee && claimCommittee && claimCommittee !== actorCommittee) continue;
-        }
-
-        // Never show a person their own claim
+        const claimCommittee = normalizeCommittee(claim.committeeName);
+        if (
+          position === 'COORDINATOR' &&
+          actorCommittee &&
+          claimCommittee &&
+          claimCommittee !== actorCommittee
+        ) continue;
         if (String(claim.student?._id) === String(actorId)) continue;
 
+        if (position === 'FEST_COORDINATOR') {
+          const hasCoordinatorVerification = Array.isArray(claim.verifications)
+            && claim.verifications.some((v) => v?.stage === 'COORDINATOR');
+          if (hasCoordinatorVerification && ['PENDING_TEAM_COORD', 'PENDING_COORD', 'PENDING_FC'].includes(claim.status)) {
+            continue;
+          }
+        }
         results.push({
           ...claim.toObject(),
-          claimantPosition: claim.submitterFestPosition,
+          claimantPosition: claim.submitterFestPosition || 'SUB_COORDINATOR',
           claimantCommittee: claim.committeeName || '',
           festId,
           festName: membership.fest.name || membership.fest.festName || '',
@@ -229,10 +227,6 @@ async function getFestClaimsForActor(req, res) {
 }
 
 // ─── Fest claim: VERIFY by Coordinator ────────────────────────
-//
-// A COORDINATOR can verify a SUB_COORDINATOR's claim.
-// The claim goes straight to VERIFIED_FEST — no FC step needed.
-// ──────────────────────────────────────────────────────────────
 async function verifyFestClaimByCoord(req, res) {
   try {
     const { claimId } = req.params;
@@ -240,24 +234,20 @@ async function verifyFestClaimByCoord(req, res) {
 
     const missing = requireFields(req.body, ['verifierId', 'verifierName']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))    return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId))   return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(verifierId)) return res.status(400).json({ message: 'Invalid verifierId.' });
 
     const claim = await RefundRequest.findById(claimId);
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
     if (claim.requestType !== 'FEST_REIMBURSEMENT')
       return res.status(400).json({ message: 'Not a fest claim.' });
-    if (claim.status !== 'PENDING')
+    if (!['PENDING_TEAM_COORD', 'PENDING_COORD'].includes(claim.status))
       return res.status(400).json({ message: `Cannot verify: claim is in status '${claim.status}'.` });
 
-    // Claimant must be a SUB_COORDINATOR
     const claimMembership = await getFestMembershipForClaim(claim);
     if (!claimMembership)
       return res.status(400).json({ message: 'Claim is missing fest membership metadata.' });
-    if (claimMembership.position !== 'SUB_COORDINATOR')
-      return res.status(403).json({ message: 'Coordinators can only verify Sub-Coordinator claims.' });
 
-    // Verifier must be an active COORDINATOR in the same fest
     const festMember = await FestMember.findOne({
       user: verifierId,
       fest: claim.festId,
@@ -267,15 +257,17 @@ async function verifyFestClaimByCoord(req, res) {
     if (!festMember)
       return res.status(403).json({ message: 'Only active Coordinators can verify at this stage.' });
 
-    // Same-committee check
     const verifierCommittee = normalizeCommittee(festMember.committee);
-    const claimCommittee    = normalizeCommittee(claim.committeeName);
-    if (verifierCommittee && claimCommittee && verifierCommittee !== claimCommittee)
-      return res.status(403).json({ message: 'Coordinator can only verify claims from the same committee.' });
+    const claimCommittee = normalizeCommittee(claim.committeeName);
+    if (verifierCommittee && claimCommittee && verifierCommittee !== claimCommittee) {
+      return res.status(403).json({ message: 'Coordinator verification is only allowed for claims in the same committee.' });
+    }
 
-    // Cannot verify own claim
     if (String(claim.student) === String(verifierId))
       return res.status(403).json({ message: 'You cannot verify your own claim.' });
+
+    if (claimMembership.position !== 'SUB_COORDINATOR')
+      return res.status(403).json({ message: 'Coordinator verification is only allowed for sub-coordinator claims in the same committee.' });
 
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
@@ -317,10 +309,6 @@ async function verifyFestClaimByCoord(req, res) {
 }
 
 // ─── Fest claim: VERIFY by Fest Coordinator ───────────────────
-//
-// A FEST_COORDINATOR can verify a COORDINATOR's own claim.
-// Sub-coordinator claims are handled exclusively by COORDINATORs above.
-// ──────────────────────────────────────────────────────────────
 async function verifyFestClaimByFC(req, res) {
   try {
     const { claimId } = req.params;
@@ -328,24 +316,22 @@ async function verifyFestClaimByFC(req, res) {
 
     const missing = requireFields(req.body, ['verifierId', 'verifierName']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))    return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId))   return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(verifierId)) return res.status(400).json({ message: 'Invalid verifierId.' });
 
     const claim = await RefundRequest.findById(claimId);
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
     if (claim.requestType !== 'FEST_REIMBURSEMENT')
       return res.status(400).json({ message: 'Not a fest claim.' });
-    if (claim.status !== 'PENDING')
+
+    const allowedStatuses = ['PENDING_FC', 'PENDING_COORD', 'PENDING_TEAM_COORD'];
+    if (!allowedStatuses.includes(claim.status))
       return res.status(400).json({ message: `Cannot verify: claim is in status '${claim.status}'.` });
 
-    // Claimant must be a COORDINATOR — SUB_COORD claims go through verifyFestClaimByCoord
     const claimMembership = await getFestMembershipForClaim(claim);
     if (!claimMembership)
       return res.status(400).json({ message: 'Claim is missing fest membership metadata.' });
-    if (claimMembership.position !== 'COORDINATOR')
-      return res.status(403).json({ message: 'Fest Coordinators can only verify Coordinator claims. Sub-Coordinator claims must be verified by a Coordinator.' });
 
-    // Verifier must be an active FEST_COORDINATOR in the same fest
     const festMember = await FestMember.findOne({
       user: verifierId,
       fest: claim.festId,
@@ -355,9 +341,18 @@ async function verifyFestClaimByFC(req, res) {
     if (!festMember)
       return res.status(403).json({ message: 'Only active Fest Coordinators can verify at this stage.' });
 
-    // Cannot verify own claim
     if (String(claim.student) === String(verifierId))
       return res.status(403).json({ message: 'You cannot verify your own claim.' });
+
+    if (!['COORDINATOR', 'SUB_COORDINATOR'].includes(claimMembership.position))
+      return res.status(403).json({ message: 'Fest Coordinators can only verify coordinator or sub-coordinator claims in the same fest.' });
+
+    // Block FC if a Coordinator has already verified this claim
+    const hasCoordinatorVerification = Array.isArray(claim.verifications)
+      && claim.verifications.some((v) => v?.stage === 'COORDINATOR');
+    if (hasCoordinatorVerification) {
+      return res.status(400).json({ message: 'This claim is already coordinator-verified and has been forwarded for Fest Secretary approval.' });
+    }
 
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
@@ -544,7 +539,7 @@ async function rejectClaim(req, res) {
 
     const missing = requireFields(req.body, ['rejectedBy', 'rejectedByName']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))    return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId))   return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(rejectedBy)) return res.status(400).json({ message: 'Invalid rejectedBy.' });
 
     const claim = await RefundRequest.findById(claimId);
@@ -563,7 +558,6 @@ async function rejectClaim(req, res) {
           rejectedAt: new Date(),
           rejectionReason: rejectionReason.trim(),
           rejectedAtStage: stage || claim.status,
-          // Wipe any stale accounts-hold flags so DB stays clean
           accountsBatchStatus: '',
           accountsHoldFlaggedAt: null,
           accountsHoldFlaggedBy: null,
@@ -599,7 +593,6 @@ async function rejectClaim(req, res) {
   }
 }
 
-// ─── Flag a claim ON HOLD inside an accounts batch ────────────
 async function flagAccountsClaimHold(req, res) {
   try {
     const { claimId } = req.params;
@@ -607,17 +600,19 @@ async function flagAccountsClaimHold(req, res) {
 
     const missing = requireFields(req.body, ['flaggedBy', 'flaggedByName']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))  return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId)) return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(flaggedBy)) return res.status(400).json({ message: 'Invalid flaggedBy.' });
 
     const actor = await User.findById(flaggedBy);
-    if (!actor || actor.department !== 'account')
+    if (!actor || actor.department !== 'account') {
       return res.status(403).json({ message: 'Only Accounts department can flag holds.' });
+    }
 
     const claim = await RefundRequest.findById(claimId);
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
-    if (claim.status !== 'UNDER_PROCESS')
+    if (claim.status !== 'UNDER_PROCESS') {
       return res.status(400).json({ message: `Only under-process claims can be held. Current: '${claim.status}'.` });
+    }
 
     const holdReason = reason?.trim() || 'Held by accounts.';
 
@@ -650,7 +645,6 @@ async function flagAccountsClaimHold(req, res) {
   }
 }
 
-// ─── Clear a claim's accounts HOLD ────────────────────────────
 async function clearAccountsClaimHold(req, res) {
   try {
     const { claimId } = req.params;
@@ -658,17 +652,19 @@ async function clearAccountsClaimHold(req, res) {
 
     const missing = requireFields(req.body, ['clearedBy', 'clearedByName']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))  return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId)) return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(clearedBy)) return res.status(400).json({ message: 'Invalid clearedBy.' });
 
     const actor = await User.findById(clearedBy);
-    if (!actor || actor.department !== 'account')
+    if (!actor || actor.department !== 'account') {
       return res.status(403).json({ message: 'Only Accounts department can clear holds.' });
+    }
 
     const claim = await RefundRequest.findById(claimId);
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
-    if (claim.status !== 'UNDER_PROCESS')
+    if (claim.status !== 'UNDER_PROCESS') {
       return res.status(400).json({ message: `Only under-process claims can be updated. Current: '${claim.status}'.` });
+    }
 
     const populated = await RefundRequest.findByIdAndUpdate(
       claimId,
@@ -707,7 +703,7 @@ async function approveClaim(req, res) {
 
     const missing = requireFields(req.body, ['approvedBy', 'approvedByName']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))   return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId))  return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(approvedBy)) return res.status(400).json({ message: 'Invalid approvedBy.' });
 
     const claim = await RefundRequest.findById(claimId);
@@ -772,7 +768,7 @@ async function undoClaimApproval(req, res) {
     const missing = requireFields(req.body, ['undoBy', 'undoByName']);
     if (missing) return res.status(400).json({ message: missing });
     if (!isValidObjectId(claimId)) return res.status(400).json({ message: 'Invalid claimId.' });
-    if (!isValidObjectId(undoBy))  return res.status(400).json({ message: 'Invalid undoBy.' });
+    if (!isValidObjectId(undoBy)) return res.status(400).json({ message: 'Invalid undoBy.' });
 
     const claim = await RefundRequest.findById(claimId);
     if (!claim) return res.status(404).json({ message: 'Claim not found.' });
@@ -884,7 +880,7 @@ async function pushClaimsToAccounts(req, res) {
   }
 }
 
-// ─── REFUND a single claim (accounts department) ──────────────
+// ─── REFUND a claim (accounts department) ─────────────────────
 async function refundClaim(req, res) {
   try {
     const { claimId } = req.params;
@@ -892,7 +888,7 @@ async function refundClaim(req, res) {
 
     const missing = requireFields(req.body, ['refundedBy', 'refundedByName', 'transactionRef', 'refundedAmount']);
     if (missing) return res.status(400).json({ message: missing });
-    if (!isValidObjectId(claimId))   return res.status(400).json({ message: 'Invalid claimId.' });
+    if (!isValidObjectId(claimId))  return res.status(400).json({ message: 'Invalid claimId.' });
     if (!isValidObjectId(refundedBy)) return res.status(400).json({ message: 'Invalid refundedBy.' });
 
     const parsedAmount = parseFloat(refundedAmount);
@@ -948,7 +944,6 @@ async function refundClaim(req, res) {
   }
 }
 
-// ─── EXPORT batch CSV for bank processing ─────────────────────
 async function exportAccountsBatch(req, res) {
   try {
     const { exportedBy, exportedByName } = req.body;
@@ -964,8 +959,9 @@ async function exportAccountsBatch(req, res) {
     const claims = await RefundRequest.find({ status: 'PUSHED_TO_ACCOUNTS' })
       .populate('student', 'fullName email studentId studentProfile bankDetails');
 
-    if (!claims.length)
+    if (!claims.length) {
       return res.status(200).json({ message: 'No claims available for export.', batchId: '', rows: [], csv: '' });
+    }
 
     const batchId = createAccountsBatchId();
     const grouped = new Map();
@@ -974,7 +970,7 @@ async function exportAccountsBatch(req, res) {
       const student = claim.student;
       if (!student?._id) continue;
 
-      const key  = String(student._id);
+      const key = String(student._id);
       const bank = getUserBankDetails(student);
       const existing = grouped.get(key) || {
         batchId,
@@ -990,16 +986,16 @@ async function exportAccountsBatch(req, res) {
       };
 
       existing.totalAmount += Number(claim.disbursedAmount || claim.effectiveAmount || claim.amount || 0);
-      existing.claimCount  += 1;
+      existing.claimCount += 1;
       existing.claimIds.push(claim.claimId || String(claim._id));
       grouped.set(key, existing);
     }
 
     const rows = Array.from(grouped.values()).sort((a, b) => a.studentRoll.localeCompare(b.studentRoll));
-    const csv  = buildAccountsBatchCsv(rows);
+    const csv = buildAccountsBatchCsv(rows);
 
     await RefundRequest.updateMany(
-      { _id: { $in: claims.map((c) => c._id) } },
+      { _id: { $in: claims.map((claim) => claim._id) } },
       {
         $set: {
           status: 'UNDER_PROCESS',
@@ -1042,7 +1038,6 @@ async function exportAccountsBatch(req, res) {
   }
 }
 
-// ─── REFUND an entire accounts batch (with optional hold list) ─
 async function refundAccountsBatch(req, res) {
   try {
     const { batchId } = req.params;
@@ -1058,21 +1053,19 @@ async function refundAccountsBatch(req, res) {
       return res.status(403).json({ message: 'Only Accounts department can close refund batches.' });
 
     const claims = await RefundRequest.find({ accountsBatchId: batchId, status: 'UNDER_PROCESS' });
-    if (!claims.length)
-      return res.status(404).json({ message: 'No under-process claims found for this batch.' });
+    if (!claims.length) return res.status(404).json({ message: 'No under-process claims found for this batch.' });
 
-    const validClaimIds = new Set(claims.map((c) => String(c._id)));
+    const validClaimIds = new Set(claims.map((claim) => String(claim._id)));
     const heldIds = Array.isArray(holdClaimIds)
       ? [...new Set(holdClaimIds.map((id) => String(id)).filter((id) => validClaimIds.has(id)))]
       : [];
+    const refundedClaims = claims.filter((claim) => !heldIds.includes(String(claim._id)));
+    const heldClaims = claims.filter((claim) => heldIds.includes(String(claim._id)));
 
-    const refundedClaims = claims.filter((c) => !heldIds.includes(String(c._id)));
-    const heldClaims     = claims.filter((c) =>  heldIds.includes(String(c._id)));
-
-    if (!refundedClaims.length)
+    if (!refundedClaims.length) {
       return res.status(400).json({ message: 'At least one claim must be refunded. Remove one hold or refund individually.' });
+    }
 
-    // Keep held claims in UNDER_PROCESS with ON_HOLD batch status
     if (heldClaims.length) {
       await RefundRequest.bulkWrite(
         heldClaims.map((claim) => ({
@@ -1101,9 +1094,8 @@ async function refundAccountsBatch(req, res) {
       );
     }
 
-    // Mark the rest as refunded
     await RefundRequest.updateMany(
-      { _id: { $in: refundedClaims.map((c) => c._id) } },
+      { _id: { $in: refundedClaims.map((claim) => claim._id) } },
       {
         $set: {
           status: 'REFUNDED',
@@ -1165,7 +1157,7 @@ async function getClaimsByDepartment(req, res) {
 
     const claims = await RefundRequest.find(filter)
       .populate('student', 'fullName email studentId phone hostel block roomNumber')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: 1 });
 
     res.status(200).json(claims);
   } catch (err) {
@@ -1216,35 +1208,46 @@ async function deleteClaim(req, res) {
     const { claimId } = req.params;
     const { userId } = req.body || {};
 
-    if (!isValidObjectId(claimId))
+    // Validate claimId format
+    if (!isValidObjectId(claimId)) {
       return res.status(400).json({ message: 'Invalid claim ID format.' });
+    }
 
+    // Find the claim
     const claim = await RefundRequest.findById(claimId);
-    if (!claim)
+    if (!claim) {
       return res.status(404).json({ message: 'Claim not found.' });
+    }
 
+    // Only allow deletion of pending claims
     const pendingStatuses = [
-      'PENDING',
       'PENDING_TEAM_COORD',
       'PENDING_FEST_COORD',
       'PENDING_COORD',
       'PENDING_FC',
       'PENDING_MESS_MANAGER',
       'PENDING_VP',
-      'PENDING_ACADEMIC',
+      'PENDING_ACADEMIC'
     ];
 
-    if (!pendingStatuses.includes(claim.status))
-      return res.status(403).json({
-        message: `Cannot delete claim with status '${claim.status}'. Only pending claims can be deleted.`,
+    if (!pendingStatuses.includes(claim.status)) {
+      return res.status(403).json({ 
+        message: `Cannot delete claim with status '${claim.status}'. Only pending claims can be deleted.` 
       });
+    }
 
-    if (userId && claim.student.toString() !== userId)
+    // Verify ownership (optional: if userId is provided, ensure it matches)
+    if (userId && claim.student.toString() !== userId) {
       return res.status(403).json({ message: 'You do not have permission to delete this claim.' });
+    }
 
+    // Delete the claim
     await RefundRequest.findByIdAndDelete(claimId);
 
-    res.status(200).json({ message: 'Claim deleted successfully.', claimId });
+    res.status(200).json({ 
+      message: 'Claim deleted successfully.',
+      claimId: claimId 
+    });
   } catch (err) {
     console.error('deleteClaim error:', err);
     res.status(500).json({ message: 'Server error deleting claim.' });
