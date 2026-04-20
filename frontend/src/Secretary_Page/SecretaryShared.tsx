@@ -235,6 +235,21 @@ export function StatCard({ label, value, icon: Icon, color, sub }: {
   );
 }
 
+export function FloatingSuccessToast({ message, visible }: { message: string; visible: boolean }) {
+  return (
+    <div
+      className={`fixed top-4 right-4 z-[70] transition-all duration-300 ${visible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0 pointer-events-none'}`}
+    >
+      <div className="flex items-center gap-2 rounded-xl border border-green-200 bg-white px-4 py-3 shadow-lg">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+          <CheckCircle size={16} className="text-green-600" />
+        </div>
+        <p className="text-sm font-semibold text-slate-700">{message}</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shared Secretary Layout (Sidebar + Topbar) ────────────────────────────────
 interface SecretaryLayoutProps {
   department: Department;
@@ -345,7 +360,10 @@ export function SecretaryLayout({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-20 lg:pb-0">
+        <div
+          className="flex-1 overflow-y-auto pb-20 lg:pb-0"
+          style={{ scrollbarGutter: 'stable' }}
+        >
           {children}
         </div>
 <nav
@@ -1096,7 +1114,10 @@ export function SecretaryClaimsView({ department, secretary }: ClaimsListViewPro
 export function SecretaryProfileView({ user, department, onSave }: {
   user: SecretaryUser;
   department: Department;
-  onSave: (data: Partial<SecretaryUser>, newPassword?: string) => void;
+  onSave: (
+    data: Partial<SecretaryUser>,
+    passwordData?: { currentPassword: string; newPassword: string }
+  ) => Promise<void> | void;
 }) {
   const cfg = deptConfig[department];
   const [editMode, setEditMode] = useState(false);
@@ -1108,21 +1129,57 @@ export function SecretaryProfileView({ user, department, onSave }: {
   const [pwdForm, setPwdForm] = useState({ current: '', newPwd: '', confirm: '' });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordToastVisible, setPasswordToastVisible] = useState(false);
 
   const initials = user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
   const handleSave = async () => {
     setSaving(true);
     await new Promise(r => setTimeout(r, 800));
-    onSave(editData);
+    await onSave(editData);
     setSaving(false);
     setEditMode(false);
     setSuccess(true);
     setTimeout(() => setSuccess(false), 3000);
   };
 
+  const handlePasswordUpdate = async () => {
+    setPasswordError('');
+    if (!pwdForm.current || !pwdForm.newPwd || !pwdForm.confirm) {
+      setPasswordError('All password fields are required.');
+      return;
+    }
+    if (pwdForm.newPwd !== pwdForm.confirm) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+    if (pwdForm.newPwd.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await onSave({}, {
+        currentPassword: pwdForm.current,
+        newPassword: pwdForm.newPwd,
+      });
+      setPwdForm({ current: '', newPwd: '', confirm: '' });
+      setShowPwd(false);
+      setPasswordToastVisible(true);
+      setTimeout(() => setPasswordToastVisible(false), 2500);
+    } catch (error: any) {
+      setPasswordError(error?.message || 'Failed to update password.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5 max-w-3xl mx-auto">
+      <FloatingSuccessToast message="Password updated successfully" visible={passwordToastVisible} />
       <div className="flex items-center justify-between">
         <div><h2 className="text-xl font-bold text-slate-800">My Profile</h2><p className="text-slate-500 text-sm mt-0.5">View and edit your account details</p></div>
         {success && <span className="text-green-600 text-sm font-semibold flex items-center gap-1"><CheckCircle size={14} /> Saved</span>}
@@ -1193,12 +1250,14 @@ export function SecretaryProfileView({ user, department, onSave }: {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2" style={{ '--tw-ring-color': cfg.accent } as any} />
               </div>
             ))}
-            <button onClick={() => {
-              if (pwdForm.newPwd === pwdForm.confirm && pwdForm.newPwd.length >= 8) {
-                onSave({}, pwdForm.newPwd); setShowPwd(false); setPwdForm({ current: '', newPwd: '', confirm: '' });
-              }
-            }} className="px-5 py-2.5 text-white rounded-xl text-sm font-bold" style={{ background: cfg.accent }}>
-              Update Password
+            {passwordError && <p className="text-red-500 text-xs font-medium">{passwordError}</p>}
+            <button
+              onClick={handlePasswordUpdate}
+              disabled={passwordSaving}
+              className="px-5 py-2.5 text-white rounded-xl text-sm font-bold disabled:opacity-60"
+              style={{ background: cfg.accent }}
+            >
+              {passwordSaving ? 'Updating...' : 'Update Password'}
             </button>
           </div>
         )}

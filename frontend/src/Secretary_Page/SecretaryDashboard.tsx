@@ -178,7 +178,7 @@ export function AllClaimsView() {
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Ref ID', 'Student', 'Dept.', 'Amount', 'Status', 'Submitted', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -188,12 +188,12 @@ export function AllClaimsView() {
                   const studentRoll = claim.student?.studentId || claim.studentRoll || '—';
                   return (
                     <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
+                      <td className="px-4 py-4 text-center">
                         <p className="font-semibold text-slate-700 text-sm">{studentName}</p>
                         <p className="text-xs text-slate-400">{studentRoll}</p>
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 text-center whitespace-nowrap">
                         {claim.department ? (
                           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${deptBadge[claim.department]}`}>
                             {deptLabel[claim.department]}
@@ -202,17 +202,17 @@ export function AllClaimsView() {
                           <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 text-center whitespace-nowrap">
                         <span className="font-black text-slate-700">₹{claim.amount.toLocaleString('en-IN')}</span>
                       </td>
-                      <td className="px-4 py-4"><StatusBadge status={claim.status} /></td>
-                      <td className="px-4 py-4 whitespace-nowrap text-xs text-slate-400">
+                      <td className="px-4 py-4 text-center"><div className="flex justify-center"><StatusBadge status={claim.status} /></div></td>
+                      <td className="px-4 py-4 text-center whitespace-nowrap text-xs text-slate-400">
                         {claim.submittedAt
                           ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })
                           : '—'}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-4 py-4 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button onClick={() => setSelected(claim)} title="View / Override"
                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                             <Eye size={15} />

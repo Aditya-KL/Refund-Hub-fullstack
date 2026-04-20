@@ -42,7 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     id: 'approve-reimbursement',
-    label: 'Approve Reimbursement',
+    label: 'Verify Reimbursement',
     icon: CheckSquare,
     requiredRoles: ['FEST_COORDINATOR', 'COORDINATOR'],
   },

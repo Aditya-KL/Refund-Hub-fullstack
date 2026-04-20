@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home, ClipboardList, Settings, TrendingUp, AlertCircle,
   DollarSign, Activity, Crown, LogOut, UserPlus, Circle,
   Menu, X, User, Trash2, Plus, Eye, EyeOff, Search,
   Filter, RefreshCw, ChevronLeft, ChevronRight,
-  AlertTriangle, CheckCircle, Clock, MoreVertical,
+  AlertTriangle, CheckCircle, Clock, MoreVertical, ChevronDown
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PortalSettingsView } from './PortalSettingsView';
@@ -82,6 +82,12 @@ interface AdminClaim {
   };
 }
 
+interface AdminToastState {
+  type: 'success' | 'error';
+  title: string;
+  message: string;
+}
+
 // ─── Static / Chart Data ──────────────────────────────────────────────────────
 const mockAuditLogs: AuditLog[] = [
   { _id: 'a1', secretaryId: '1', secretaryName: 'Dr. Rajesh Kumar', action: 'APPROVE_CLAIM', targetCollection: 'claims', targetId: 'CLM-1041', details: 'Approved mess rebate claim for student Arjun Mehta (Roll: 21BCS045)', ipAddress: '192.168.1.12', timestamp: '2025-03-27T10:32:00Z', status: 'success' },
@@ -132,6 +138,7 @@ function AddSecretaryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s:
   const [showPwd, setShowPwd] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [deptOpen, setDeptOpen] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -199,10 +206,18 @@ function AddSecretaryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s:
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Phone</label>
               <input
-                type="tel" value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="9876543210"
-                className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${errors.phone ? 'border-red-500' : 'border-slate-600'}`}
+                type="text" 
+                maxLength={10} 
+                value={form.phone} 
+                onChange={e => {
+                  let val = e.target.value.replace(/\D/g, '');
+                  if (val.startsWith('0')) {
+                    val = val.slice(1);
+                  }
+                  setForm({ ...form, phone: val.slice(0, 10) });
+                }}
+                className={`w-full px-3.5 py-2.5 bg-slate-900 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-slate-600 ${errors.phone ? 'border-red-500' : 'border-slate-600'}`}
+                placeholder="10-digit number"
               />
               {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
             </div>
@@ -224,16 +239,49 @@ function AddSecretaryModal({ onClose, onAdd }: { onClose: () => void; onAdd: (s:
           </div>
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Department</label>
-            <select
-              value={form.department}
-              onChange={e => setForm(f => ({ ...f, department: e.target.value as any }))}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="mess">Mess Department</option>
-              <option value="hospital">Medical Department</option>
-              <option value="fest">Cultural & Fest Cell</option>
-              <option value="account">Accounts Department</option>
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setDeptOpen(!deptOpen)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-900 border border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-white hover:bg-slate-800 transition-colors"
+              >
+                <span className={form.department ? "text-white" : "text-slate-400"}>
+                  {form.department === 'account' ? 'Accounts Department' :
+                   form.department === 'mess' ? 'Mess Department' :
+                   form.department === 'hospital' ? 'Medical Department' :
+                   form.department === 'fest' ? 'Cultural & Fest Cell' : 'Select Department'}
+                </span>
+                <ChevronDown size={15} className={`text-slate-400 transition-transform ${deptOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {deptOpen && (
+                <>
+                  <div className="fixed inset-0 z-[110]" onClick={() => setDeptOpen(false)} />
+                  <div className="absolute z-[120] w-full mb-1 bottom-full bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black max-h-48 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
+                    {[
+                      { id: 'mess', label: 'Mess Department' },
+                      { id: 'hospital', label: 'Medical Department' },
+                      { id: 'fest', label: 'Cultural & Fest Cell' },
+                      { id: 'account', label: 'Accounts Department' }
+                    ].map(dept => (
+                      <button
+                        key={dept.id}
+                        type="button"
+                        onClick={() => { 
+                          setForm({ ...form, department: dept.id as any }); 
+                          setDeptOpen(false); 
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                          form.department === dept.id ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-slate-300 hover:bg-slate-700'
+                        }`}
+                      >
+                        {dept.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex gap-3 p-5 border-t border-slate-700">
@@ -366,7 +414,7 @@ function ManageSecretariesModal({ onClose }: { onClose: () => void }) {
                 <thead className="sticky top-0 bg-slate-800/95">
                   <tr className="border-b border-slate-700">
                     {['Name & ID', 'Department', 'Contact', 'Last Login', 'Status', ''].map(h => (
-                      <th key={h} className="text-left py-3 px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                      <th key={h} className="py-3 px-4 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -388,29 +436,29 @@ function ManageSecretariesModal({ onClose }: { onClose: () => void }) {
                     </tr>
                   ) : filtered.map(s => (
                     <tr key={s._id} className="border-b border-slate-700/40 hover:bg-slate-700/20 transition-colors">
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <p className="font-semibold text-white text-sm">{s.fullName}</p>
                         <p className="text-slate-500 text-xs mt-0.5">{s.studentId}</p>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${deptColor[s.department] || deptColor.mess}`}>
                           {deptLabelFull[s.department] || s.department}
                         </span>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <p className="text-slate-300 text-xs">{s.email}</p>
                         <p className="text-slate-500 text-xs mt-0.5">{s.phone}</p>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 text-center">
                         <p className="text-slate-400 text-xs">{getTimeAgo(s.lastLogin)}</p>
                       </td>
-                      <td className="py-4 px-4">
-                        <span className={`text-xs flex items-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                      <td className="py-4 px-4 text-center">
+                        <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
                           <Circle size={6} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
                           {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-right">
+                      <td className="py-4 px-4 text-center">
                         <button
                           onClick={() => setDeleteConfirm(s._id)}
                           className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
@@ -699,6 +747,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   const [portalActive, setPortalActive] = useState(true);
   const [showManageModal, setShowManageModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [adminToast, setAdminToast] = useState<AdminToastState | null>(null);
 
   // Overview table: live secretaries from DB
   const [secretaries, setSecretaries] = useState<Secretary[]>([]);
@@ -706,6 +755,8 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   const [allClaims, setAllClaims] = useState<AdminClaim[]>([]);
   const [loadingClaims, setLoadingClaims] = useState(true);
   const [adminActionLoading, setAdminActionLoading] = useState<string | null>(null);
+  const didLoadSecretariesRef = useRef(false);
+  const secretariesSnapshotRef = useRef('');
 
   const baseUrl = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
   const storedUser = (() => {
@@ -730,27 +781,44 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
   };
 
   useEffect(() => {
-    const fetchSecretaries = async () => {
+    const fetchSecretaries = async (showLoader = false) => {
       try {
-        setLoadingSecretaries(true);
+        if (showLoader && !didLoadSecretariesRef.current) {
+          setLoadingSecretaries(true);
+        }
         const data = await apiService.getSecretaries();
-        setSecretaries(data);
+        const next = Array.isArray(data) ? data : [];
+        const normalized = [...next].sort((a, b) => a._id.localeCompare(b._id));
+        const snapshot = JSON.stringify(normalized);
+        if (secretariesSnapshotRef.current !== snapshot) {
+          secretariesSnapshotRef.current = snapshot;
+          setSecretaries(normalized);
+        }
+        didLoadSecretariesRef.current = true;
       } catch (error) {
         console.error("Error fetching secretaries:", error);
       } finally {
-        setLoadingSecretaries(false);
+        if (showLoader) {
+          setLoadingSecretaries(false);
+        }
       }
     };
-    fetchSecretaries();
+    fetchSecretaries(true);
     
     // Refresh secretaries every 15 seconds to show real-time online status
-    const interval = setInterval(fetchSecretaries, 15000);
+    const interval = setInterval(() => fetchSecretaries(false), 15000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     fetchOverviewClaims();
   }, []);
+
+  useEffect(() => {
+    if (!adminToast) return;
+    const timeout = window.setTimeout(() => setAdminToast(null), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [adminToast]);
 
   // ─── Heartbeat: Update user's lastLogin every 30 seconds while on this page ────
   useEffect(() => {
@@ -800,7 +868,11 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   const handlePushApprovedClaims = async () => {
     if (!storedUser?._id) {
-      window.alert('Admin user session not found. Please log in again.');
+      setAdminToast({
+        type: 'error',
+        title: 'Session missing',
+        message: 'Admin user session not found. Please log in again.',
+      });
       return;
     }
 
@@ -817,11 +889,19 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.message || 'Failed to push claims to accounts');
-      window.alert(result.message || 'Claims pushed to accounts.');
+      setAdminToast({
+        type: 'success',
+        title: 'Pushed to Accounts',
+        message: result.message || 'Claims were successfully pushed to the accounts queue.',
+      });
       await fetchOverviewClaims();
     } catch (error: any) {
       console.error('Push claims error:', error);
-      window.alert(error.message || 'Failed to push claims to accounts.');
+      setAdminToast({
+        type: 'error',
+        title: 'Push failed',
+        message: error.message || 'Failed to push claims to accounts.',
+      });
     } finally {
       setAdminActionLoading(null);
     }
@@ -954,6 +1034,53 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
 
   return (
     <div className="flex h-screen bg-slate-900 overflow-hidden">
+      {adminToast && (
+        <div className="fixed top-4 right-4 z-[70] w-[min(92vw,24rem)]">
+          <div
+            className={`relative overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 animate-[toast-in_0.28s_ease-out] ${
+              adminToast.type === 'success'
+                ? 'border-emerald-400/30 bg-slate-900/95 text-white shadow-emerald-950/40'
+                : 'border-rose-400/30 bg-slate-900/95 text-white shadow-rose-950/40'
+            }`}
+          >
+            <div
+              className={`absolute inset-x-0 top-0 h-1 ${
+                adminToast.type === 'success' ? 'bg-emerald-400' : 'bg-rose-400'
+              }`}
+            />
+            <div className="flex items-start gap-3 p-4 pr-12">
+              <div
+                className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${
+                  adminToast.type === 'success'
+                    ? 'border-emerald-400/30 bg-emerald-400/15 text-emerald-300'
+                    : 'border-rose-400/30 bg-rose-400/15 text-rose-300'
+                }`}
+              >
+                {adminToast.type === 'success' ? <CheckCircle size={18} /> : <AlertTriangle size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold tracking-tight">{adminToast.title}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-300">{adminToast.message}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminToast(null)}
+              className="absolute right-3 top-3 rounded-xl p-1.5 text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Dismiss notification"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes toast-in {
+          0% { opacity: 0; transform: translateY(-10px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
 
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-slate-800 border-r border-slate-700 flex-shrink-0">
@@ -1038,16 +1165,6 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                 <p className="text-xs text-slate-400 hidden sm:block">{pageTitles[activeView]?.sub}</p>
               </div>
             </div>
-            {/* <div className="flex items-center gap-2.5">
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-slate-500">Portal Status</p>
-                <p className={`text-xs font-bold ${portalActive ? 'text-green-400' : 'text-red-400'}`}>{portalActive ? 'ACTIVE' : 'DISABLED'}</p>
-              </div>
-              <button onClick={() => setPortalActive(v => !v)}
-                className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors ${portalActive ? 'bg-green-600' : 'bg-red-600'}`}>
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${portalActive ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div> */}
           </div>
         </div>
 
@@ -1090,7 +1207,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                       <thead>
                         <tr className="border-b border-slate-700">
                           {['Admin Name', 'Department', 'Status', 'Last Login'].map(h => (
-                            <th key={h} className="text-left py-2.5 px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                            <th key={h} className="py-2.5 px-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -1112,22 +1229,22 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
                           </tr>
                         ) : secretaries.map(s => (
                           <tr key={s._id} className="border-b border-slate-700/40 hover:bg-slate-700/20 transition-colors">
-                            <td className="py-3.5 px-3">
+                            <td className="py-3.5 px-3 text-center">
                               <p className="font-semibold text-white text-sm">{s.fullName}</p>
                               <p className="text-slate-500 text-xs">{s.studentId}</p>
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-3.5 px-3 text-center">
                               <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${deptColor[s.department] || deptColor.mess}`}>
                                 {deptLabelFull[s.department] || s.department}
                               </span>
                             </td>
-                            <td className="py-3.5 px-3">
-                              <span className={`text-xs flex items-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
+                            <td className="py-3.5 px-3 text-center">
+                              <span className={`text-xs inline-flex items-center justify-center gap-1.5 ${isUserOnline(s.lastLogin) ? 'text-green-400' : 'text-slate-500'}`}>
                                 <Circle size={6} className={isUserOnline(s.lastLogin) ? 'fill-green-400 animate-pulse' : 'fill-slate-500'} />
                                 {isUserOnline(s.lastLogin) ? 'Online' : 'Offline'}
                               </span>
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-3.5 px-3 text-center">
                               <p className="text-slate-400 text-xs">{getTimeAgo(s.lastLogin)}</p>
                             </td>
                           </tr>

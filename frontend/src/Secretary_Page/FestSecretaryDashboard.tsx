@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home, Users, CheckSquare, Archive, User,
   Plus, Trash2, Star, Music, Zap, Globe, Mic,
   TrendingUp, Clock, CheckCircle, XCircle, AlertTriangle,
   Search, RefreshCw, Eye, Circle,
-  DollarSign, Pencil, Save, X, KeyRound, Loader2,
+  RotateCcw, DollarSign, Pencil, Save, X, KeyRound, Loader2,
 } from 'lucide-react';
 import {
   SecretaryLayout, ClaimReviewPanel,
-  StatCard, StatusBadge, deptConfig,
+  StatCard, StatusBadge, deptConfig, FloatingSuccessToast,
   type Claim, type SecretaryUser, type StudentUser,
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
@@ -85,6 +85,7 @@ function DynamicProfilePage({
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
+  const [pwToastVisible, setPwToastVisible] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -143,6 +144,8 @@ function DynamicProfilePage({
       setPwSuccess('Password changed successfully!');
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPassword(false);
+      setPwToastVisible(true);
+      setTimeout(() => setPwToastVisible(false), 2500);
     } catch (err: any) {
       setPwError(err.message || 'Failed to change password.');
     } finally {
@@ -162,6 +165,7 @@ function DynamicProfilePage({
 
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5 max-w-3xl mx-auto">
+      <FloatingSuccessToast message="Password updated successfully" visible={pwToastVisible} />
       <div className="rounded-2xl p-5 flex items-center gap-4 bg-gradient-to-r from-violet-500 to-purple-600">
         <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center text-white font-black text-xl flex-shrink-0">
           {initials}
@@ -801,7 +805,7 @@ function ApproveReimbursementsPage({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
-  const queue = claims.filter(c => c.status === 'verified');
+  const queue = claims.filter(c => c.status === 'pending');
   const filtered = queue.filter(c => {
     const ms = search.toLowerCase();
     return (
@@ -870,10 +874,10 @@ function ApproveReimbursementsPage({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">Approve Reimbursements</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Claims verified by FCs and ready for final approval</p>
+          <p className="text-slate-500 text-sm mt-0.5">Claims verified by FCs — awaiting your final approval</p>
         </div>
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-xl text-sm font-bold self-start sm:self-auto">
-          <Clock size={14} /> {queue.length} verified
+          <Clock size={14} /> {queue.length} pending
         </span>
       </div>
 
@@ -913,8 +917,8 @@ function ApproveReimbursementsPage({
       {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-16 text-center">
           <CheckCircle size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="font-semibold text-slate-400">No verified claims awaiting approval</p>
-          <p className="text-slate-300 text-sm mt-1">All verified claims are already processed</p>
+          <p className="font-semibold text-slate-400">No claims awaiting approval</p>
+          <p className="text-slate-300 text-sm mt-1">All verified claims have been processed</p>
         </div>
       ) : (
         <>
@@ -1033,29 +1037,59 @@ function ApproveReimbursementsPage({
 }
 
 // ─── Verified Reimbursements ───────────────────────────────────────────────────
-function HistoryPage({ claims }: { claims: Claim[] }) {
+function VerifiedPage({
+  claims,
+  setClaims,
+  currentUser,
+}: {
+  claims: Claim[];
+  setClaims: React.Dispatch<React.SetStateAction<Claim[]>>;
+  currentUser: SecretaryUser | null;
+}) {
   const [selected, setSelected] = useState<Claim | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected' | 'disbursed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'approved' | 'rejected' | 'disbursed'>('all');
 
-  const historyClaims = claims.filter(c => ['approved', 'rejected', 'disbursed'].includes(c.status));
-  const filtered = historyClaims.filter(c => {
+  const verified = claims.filter(c => c.status === 'verified');
+  const filtered = verified.filter(c => {
     const ms = search.toLowerCase();
     return (
       (statusFilter === 'all' || c.status === statusFilter) &&
       (
         (c.studentName ?? '').toLowerCase().includes(ms) ||
-        (c.claimRefId ?? '').toLowerCase().includes(ms) ||
-        (c.studentRoll ?? '').toLowerCase().includes(ms)
+        (c.claimRefId ?? '').toLowerCase().includes(ms)
       )
     );
   });
 
+  const handleUnverify = async (id: string) => {
+    const stored = currentUser || JSON.parse(localStorage.getItem('user') || '{}');
+    try {
+      const res = await fetch(`${BASE}/api/admin/update-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          claimId: id,
+          status: 'VERIFIED_FEST',
+          remarks: `Reverted to Verified by ${stored.fullName}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Revert failed');
+      setClaims(prev =>
+        prev.map(c => c._id === id ? { ...c, status: 'verified' } : c)
+      );
+    } catch (err: any) {
+      console.error('Revert failed:', err.message);
+      // optionally surface this to the user via a toast/alert
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-5">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">History</h2>
-        <p className="text-slate-500 text-sm mt-0.5">Approved, rejected, and refunded reimbursement records</p>
+        <h2 className="text-xl font-bold text-slate-800">Verified Reimbursements</h2>
+        <p className="text-slate-500 text-sm mt-0.5">All processed claims — you can still revert approved ones</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -1064,7 +1098,7 @@ function HistoryPage({ claims }: { claims: Claim[] }) {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by ref ID, student, roll no..."
+            placeholder="Search claims..."
             className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
           />
         </div>
@@ -1086,7 +1120,7 @@ function HistoryPage({ claims }: { claims: Claim[] }) {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <div className="py-16 text-center text-slate-400">
-            <p className="text-sm">No history records found</p>
+            <p className="text-sm">No claims found</p>
           </div>
         ) : (
           <>
@@ -1207,6 +1241,9 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   const [festIdMap, setFestIdMap] = useState<Record<string, string>>({});
   const [fcLoading, setFcLoading] = useState(true);
   const [fcError, setFcError] = useState('');
+  const didLoadFestDataRef = useRef(false);
+  const festIdMapSnapshotRef = useRef('');
+  const fcListSnapshotRef = useRef('');
 
   useEffect(() => {
     const stored = localStorage.getItem('user');
@@ -1291,7 +1328,13 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
         const fests: { _id: string; name: string }[] = await festRes.json();
         const map: Record<string, string> = {};
         fests.forEach(f => { map[f.name] = f._id; });
-        setFestIdMap(map);
+        const festMapSnapshot = JSON.stringify(
+          Object.keys(map).sort().map(key => [key, map[key]])
+        );
+        if (festIdMapSnapshotRef.current !== festMapSnapshot) {
+          festIdMapSnapshotRef.current = festMapSnapshot;
+          setFestIdMap(map);
+        }
 
         const fcRes = await fetch(`${BASE}/api/fest-members/fcs`);
         if (!fcRes.ok) throw new Error('Failed to load FC list from database.');
@@ -1308,7 +1351,14 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
           lastLogin: m.user.lastLogin || null,
           isActive: m.isActive,
         }));
-        setFcList(mapped);
+        const normalized = [...mapped].sort((a, b) => a.memberId.localeCompare(b.memberId));
+        const fcSnapshot = JSON.stringify(normalized);
+        if (fcListSnapshotRef.current !== fcSnapshot) {
+          fcListSnapshotRef.current = fcSnapshot;
+          setFcList(normalized);
+        }
+        setFcError('');
+        didLoadFestDataRef.current = true;
       } catch (e: any) {
         console.error('Fest data load error:', e);
         setFcError(e.message || 'Could not load FC data. Check your connection.');
@@ -1345,7 +1395,7 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
     { id: 'overview', label: 'Overview',       icon: Home },
     { id: 'appoint',  label: 'Appoint FC',     icon: Users },
     { id: 'approve',  label: 'Approve Reimb.',  icon: CheckSquare },
-    { id: 'history',  label: 'History',         icon: Archive },
+    { id: 'verified', label: 'Verified',        icon: Archive },
     { id: 'profile',  label: 'Profile',         icon: User },
   ];
 
@@ -1421,16 +1471,12 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
         claimsError   ? renderClaimsError() :
         <ApproveReimbursementsPage claims={claims} setClaims={setClaims} currentUser={user} />
       )}
-      {activeView === 'history' && (
+      {activeView === 'verified' && (
         claimsLoading ? <LoadingSpinner /> :
         claimsError   ? renderClaimsError() :
-        <HistoryPage claims={claims} />
+        <VerifiedPage claims={claims} setClaims={setClaims} currentUser={user} />
       )}
       {activeView === 'profile'  && <DynamicProfilePage user={user} setUser={setUser} />}
     </SecretaryLayout>
   );
 }
-
-
-
-

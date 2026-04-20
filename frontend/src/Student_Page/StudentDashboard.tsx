@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, DollarSign, Clock, CheckCircle, Home, FileText, User, Users, Shield } from 'lucide-react';
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -29,7 +29,7 @@ import { ManageTeamView } from './FestTeam_View/ManageTeamView';
 import { VerifyReimbursementView } from './FestTeam_View/VerifyReimbursement';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
+type ToastType = { message: string; type: 'success' | 'error' | 'warning' | 'info' } | null;
 type FestRole = 'FEST_COORDINATOR' | 'COORDINATOR' | 'SUB_COORDINATOR';
 
 interface UserFest {
@@ -43,35 +43,6 @@ interface UserFest {
 
 interface StudentDashboardProps {
   onLogout: () => void;
-}
-
-const DASHBOARD_VIEWS = [
-  'dashboard',
-  'claims',
-  'refunds',
-  'history',
-  'manage-team',
-  'approve-reimbursement',
-  'profile',
-  'settings',
-] as const;
-
-type DashboardView = (typeof DASHBOARD_VIEWS)[number];
-
-function isDashboardView(value: string | null | undefined): value is DashboardView {
-  return !!value && DASHBOARD_VIEWS.includes(value as DashboardView);
-}
-
-function getViewFromUrl(): DashboardView | null {
-  const params = new URLSearchParams(window.location.search);
-  const viewParam = params.get('view');
-  return isDashboardView(viewParam) ? viewParam : null;
-}
-
-function buildUrlWithView(view: DashboardView): string {
-  const url = new URL(window.location.href);
-  url.searchParams.set('view', view);
-  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 // ─── Bottom Nav Component (Mobile) ────────────────────────────────────────
@@ -129,42 +100,19 @@ function BottomNav({
 export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
 
-  // ── Navigation ──
-  const [activeMenuItem, setActiveMenuItem] = useState<DashboardView>(() => {
-    if (typeof window === 'undefined') return 'dashboard';
-    const stateView = isDashboardView(window.history.state?.appView)
-      ? window.history.state.appView
-      : null;
-    const urlView = getViewFromUrl();
-    return stateView || urlView || 'dashboard';
-  });
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // ── Custom Native Toast State ──
+  const [toastState, setToastState] = useState<ToastType>(null);
 
-  const navigateTo = useCallback((nextView: string) => {
-    if (!isDashboardView(nextView)) return;
-
-    setActiveMenuItem(nextView);
-    setMobileMenuOpen(false);
-
-    const currentStateView = isDashboardView(window.history.state?.appView)
-      ? window.history.state.appView
-      : null;
-
-    if (currentStateView === nextView) {
-      window.history.replaceState(
-        { ...(window.history.state || {}), appView: nextView },
-        '',
-        buildUrlWithView(nextView),
-      );
-      return;
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info', duration = 5000) => {
+    setToastState({ message, type });
+    if (type !== 'info') {
+      setTimeout(() => setToastState(null), duration);
     }
+  };
 
-    window.history.pushState(
-      { ...(window.history.state || {}), appView: nextView },
-      '',
-      buildUrlWithView(nextView),
-    );
-  }, []);
+  // ── Navigation ──
+  const [activeMenuItem, setActiveMenuItem] = useState('dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ── Modals & Forms ──
   const [showNewClaimModal, setShowNewClaimModal] = useState(false);
@@ -224,38 +172,6 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       }, new Map<string, UserFest>())
       .values()
   );
-
-  // Sync initial browser history state and restore the initial in-app view.
-  useEffect(() => {
-    const stateView = isDashboardView(window.history.state?.appView)
-      ? window.history.state.appView
-      : null;
-    const urlView = getViewFromUrl();
-    const initialView = stateView || urlView || 'dashboard';
-
-    window.history.replaceState(
-      { ...(window.history.state || {}), appView: initialView },
-      '',
-      buildUrlWithView(initialView),
-    );
-  }, []);
-
-  // Handle browser back/forward buttons for SPA navigation.
-  useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      const stateView = isDashboardView(event.state?.appView)
-        ? event.state.appView
-        : null;
-      const urlView = getViewFromUrl();
-      const nextView = stateView || urlView || 'dashboard';
-
-      setActiveMenuItem(nextView);
-      setMobileMenuOpen(false);
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
 
   // ── Fetch Admin Settings ─────────────────────────────────────────────────
   useEffect(() => {
@@ -420,13 +336,14 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const handleTrackStatus = () => {
     setShowSuccessConfirmation(false);
     setShowFestClaimSuccess(false);
-    navigateTo('claims');
+    setActiveMenuItem('claims');
   };
 
   // ─── Form Submit Handlers ─────────────────────────────────────────────────
-
   const handleMessRebateSubmit = (data: MessRebateFormData) => {
     const submit = async () => {
+      showToast('Submitting your claim...', 'info');
+
       try {
         const formData = new FormData();
         formData.append('studentId', loggedInUser.studentId);
@@ -443,29 +360,44 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
         const result = await response.json();
 
         if (!response.ok) {
-          alert('Submission failed: ' + result.message);
+          showToast(result.message, 'error');
           return;
+        }
+
+        const claim = result.claim;
+
+        if (claim && claim.effectiveMessDays < claim.messAbsenceDays) {
+          showToast(
+            `Success! Note: You requested ${claim.messAbsenceDays} days, but you only have ${claim.effectiveMessDays} days left in your limit.`,
+            'warning',
+            8000
+          );
+        } else {
+          showToast('Mess rebate submitted successfully!', 'success');
         }
 
         setShowMessRebateForm(false);
         setSuccessClaimData({
-          claimId: result.claim.claimId,
+          claimId: claim.claimId,
           type: 'Mess Rebate',
-          amount: result.claim.amount,
+          amount: claim.effectiveAmount || claim.amount,
           fromDate: data.fromDate,
           toDate: data.toDate,
-          submissionDate: new Date(result.claim.createdAt),
+          submissionDate: new Date(claim.createdAt),
         });
         setShowSuccessConfirmation(true);
+
       } catch (error) {
         console.error('Error submitting mess rebate:', error);
-        alert('Could not connect to the server.');
+        showToast('Could not connect to the server. Please check your internet.', 'error');
       }
     };
+    
     submit();
   };
 
   const handleFestReimbursementSubmit = async (data: FestReimbursementFormData) => {
+    showToast('Submitting fest claim...', 'info');
     try {
       const formData = new FormData();
       formData.append('studentId', loggedInUser.studentId);
@@ -486,6 +418,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       const result = await response.json();
 
       if (response.ok) {
+        showToast('Fest claim submitted successfully!', 'success');
         setShowFestReimbursementForm(false);
         setFestClaimData({
           claimId: result.claim.claimId,
@@ -493,19 +426,19 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
           amount: data.expenseAmount,
           receiptsCount: data.receiptFiles.length,
           submissionDate: new Date(result.claim.createdAt),
-          status: result.claim.status || '',
         });
         setShowFestClaimSuccess(true);
       } else {
-        alert('Submission failed: ' + result.message);
+        showToast(result.message, 'error');
       }
     } catch (error) {
       console.error('Error submitting claim:', error);
-      alert('Could not connect to the server.');
+      showToast('Could not connect to the server.', 'error');
     }
   };
 
   const handleMedicalRebateSubmit = async (data: MedicalRebateFormData) => {
+    showToast('Submitting medical claim...', 'info');
     try {
       const formData = new FormData();
       formData.append('studentId', loggedInUser.studentId);
@@ -528,10 +461,11 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       }
 
       if (!response.ok) {
-        alert('Submission failed: ' + (result?.message || `HTTP ${response.status}`));
+        showToast(result?.message || `HTTP ${response.status}`, 'error');
         return;
       }
 
+      showToast('Medical rebate submitted successfully!', 'success');
       setShowMedicalRebateForm(false);
       setSuccessClaimData({
         claimId: result.claim.claimId,
@@ -542,7 +476,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       setShowSuccessConfirmation(true);
     } catch (error) {
       console.error('Error submitting medical rebate:', error);
-      alert('Upload failed. Please retry with a stable connection.');
+      showToast('Upload failed. Please retry with a stable connection.', 'error');
     }
   };
 
@@ -560,16 +494,44 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar
-          The Sidebar receives userRole (effectiveRole) and shows "Manage Team"
-          and "Approve Reimbursements" menu items only when userRole is
-          FEST_COORDINATOR or COORDINATOR. Sub-coordinators and regular students
-          don't see those menu items at all. */}
+ return (
+    <div className="flex h-screen bg-gray-50 relative">
+      
+      {/* ─── CUSTOM TOAST UI ─── */}
+      {toastState && (
+        <div className="fixed top-6 right-6 z-[9999] animate-fade-in-down">
+          <div className={`
+            px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 max-w-sm border backdrop-blur-md
+            ${toastState.type === 'error' ? 'bg-red-50/90 border-red-200 text-red-700' : ''}
+            ${toastState.type === 'warning' ? 'bg-amber-50/90 border-amber-200 text-amber-700' : ''}
+            ${toastState.type === 'success' ? 'bg-green-50/90 border-green-200 text-green-700' : ''}
+            ${toastState.type === 'info' ? 'bg-blue-50/90 border-blue-200 text-blue-700' : ''}
+          `}>
+            <div className="text-lg">
+              {toastState.type === 'error' && '❌'}
+              {toastState.type === 'warning' && '⚠️'}
+              {toastState.type === 'success' && '✅'}
+              {toastState.type === 'info' && '⏳'}
+            </div>
+            
+            <p className="text-sm font-semibold flex-1 leading-snug">
+              {toastState.message}
+            </p>
+            
+            <button 
+              onClick={() => setToastState(null)} 
+              className="ml-2 text-current opacity-50 hover:opacity-100 transition-opacity"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SIDEBAR ─── */}
       <Sidebar
         activeItem={activeMenuItem}
-        onItemClick={navigateTo}
+        onItemClick={setActiveMenuItem}
         userRole={effectiveRole}
         mobileOpen={mobileMenuOpen}
         onMobileToggle={() => setMobileMenuOpen(v => !v)}
@@ -632,7 +594,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     </div>
                   ) : (
                     dashboardClaims.slice(0, 4).map((claim) => (
-                      <ClaimStatusCard key={claim.id} claim={claim} onClick={() => navigateTo('claims')} />
+                      <ClaimStatusCard key={claim.id} claim={claim} onClick={() => setActiveMenuItem('claims')} />
                     ))
                   )}
                 </div>
@@ -707,12 +669,12 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
           {/* ── Profile ── */}
           {activeMenuItem === 'profile' && (
-            <ProfileView onEditClick={() => navigateTo('settings')} onLogout={onLogout} />
+            <ProfileView onEditClick={() => setActiveMenuItem('settings')} onLogout={onLogout} />
           )}
 
           {/* ── Settings ── */}
           {activeMenuItem === 'settings' && (
-            <EditProfile onBack={() => navigateTo('profile')} onLogout={onLogout} />
+            <EditProfile onBack={() => setActiveMenuItem('profile')} onLogout={onLogout} />
           )}
 
           {/* ── Fallback ── */}
@@ -734,6 +696,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
         onNext={handleCategorySelect}
         isFestMember={isFestMember}
         settings={adminSettings}
+        showToast={showToast}
       />
       <MessRebateForm
         isOpen={showMessRebateForm}
@@ -782,7 +745,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       {/* Mobile Bottom Navigation */}
       <BottomNav 
         activeView={activeMenuItem} 
-        setActiveView={navigateTo}
+        setActiveView={setActiveMenuItem}
         userRole={effectiveRole}
       />
     </div>

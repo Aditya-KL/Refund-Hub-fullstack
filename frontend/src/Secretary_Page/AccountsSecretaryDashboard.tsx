@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Home, CheckSquare, History, User, Download, Eye, XCircle,
   Clock, CheckCircle2, Loader2, RefreshCw, Users, BarChart3,
-  Check, X,
 } from 'lucide-react';
 import {
   SecretaryLayout, SecretaryProfileView, StatCard,
   type SecretaryUser, type Department,
 } from './SecretaryShared';
+import { apiService } from '../services/db_service';
 
 const BASE = import.meta.env.VITE_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -44,6 +44,10 @@ type AccountClaim = {
   accountHolderName: string;
   accountsBatchId?: string;
   accountsExportedAt?: string;
+  accountsBatchStatus?: string;
+  accountsHoldFlaggedAt?: string;
+  accountsHoldFlaggedByName?: string;
+  accountsHoldReason?: string;
 };
 
 type RefundRecord = {
@@ -76,7 +80,7 @@ function inferDept(type: string): Department {
 }
 
 function mapAccountClaim(doc: any): AccountClaim {
-  const bank = doc.student?.bankDetails || {};
+  const bank = doc.student?.studentProfile?.bankDetails || doc.student?.bankDetails || {};
   return {
     _id: doc._id,
     claimId: doc.claimId || String(doc._id).slice(-8).toUpperCase(),
@@ -96,6 +100,10 @@ function mapAccountClaim(doc: any): AccountClaim {
     accountHolderName: bank.accountHolderName || '',
     accountsBatchId: doc.accountsBatchId || '',
     accountsExportedAt: doc.accountsExportedAt || '',
+    accountsBatchStatus: doc.accountsBatchStatus || '',
+    accountsHoldFlaggedAt: doc.accountsHoldFlaggedAt || '',
+    accountsHoldFlaggedByName: doc.accountsHoldFlaggedByName || '',
+    accountsHoldReason: doc.accountsHoldReason || '',
   };
 }
 
@@ -277,19 +285,23 @@ function ApproveRefundPage(props: {
   pendingClaims: AccountClaim[];
   underProcessBatches: UnderProcessBatch[];
   onExportBatch: () => void;
-  onMarkBatchRefunded: (batchId: string) => void;
+  onMarkBatchRefunded: (batchId: string, holdClaimIds: string[]) => void;
   onMarkClaimRefunded: (claimId: string) => void;
   onRejectClaim: (claimId: string) => void;
+  onRejectUnderProcessClaim: (claim: AccountClaim, reason: string) => void;
   exportLoading: boolean;
   refundingBatchId: string;
   actionError: string;
   processingId: string | null;
   setProcessingId: (id: string | null) => void;
 }) {
-  const { pendingClaims, underProcessBatches, onExportBatch, onMarkBatchRefunded, onMarkClaimRefunded, onRejectClaim, exportLoading, refundingBatchId, actionError, processingId, setProcessingId } = props;
+  const { pendingClaims, underProcessBatches, onExportBatch, onMarkBatchRefunded, onMarkClaimRefunded, onRejectClaim, onRejectUnderProcessClaim, exportLoading, refundingBatchId, actionError, processingId, setProcessingId } = props;
   const [selectedClaim, setSelectedClaim] = useState<AccountClaim | null>(null);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState<Department | 'all'>('all');
+  const [underProcessSearch, setUnderProcessSearch] = useState('');
+  const [rejectingClaimId, setRejectingClaimId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const filteredPending = useMemo(() => {
     const q = search.toLowerCase();
@@ -305,6 +317,44 @@ function ApproveRefundPage(props: {
       )
     ));
   }, [deptFilter, pendingClaims, search]);
+
+  const normalizedUnderProcessSearch = underProcessSearch.trim().toLowerCase();
+
+  const visibleUnderProcessBatches = useMemo(() => (
+    underProcessBatches
+      .map((batch) => ({
+        ...batch,
+        claims: batch.claims.filter((claim) => {
+          if (!normalizedUnderProcessSearch) return true;
+          return (
+            claim.studentName.toLowerCase().includes(normalizedUnderProcessSearch) ||
+            claim.studentRoll.toLowerCase().includes(normalizedUnderProcessSearch) ||
+            claim.studentEmail.toLowerCase().includes(normalizedUnderProcessSearch) ||
+            claim.claimId.toLowerCase().includes(normalizedUnderProcessSearch) ||
+            claim.accountNumber.toLowerCase().includes(normalizedUnderProcessSearch) ||
+            claim.ifscCode.toLowerCase().includes(normalizedUnderProcessSearch)
+          );
+        }),
+      }))
+      .filter((batch) => batch.claims.length > 0)
+  ), [normalizedUnderProcessSearch, underProcessBatches]);
+
+  const openRejectBox = (claim: AccountClaim) => {
+    setRejectingClaimId(claim._id);
+    setRejectReason(claim.accountsHoldReason || '');
+  };
+
+  const closeRejectBox = () => {
+    setRejectingClaimId(null);
+    setRejectReason('');
+  };
+
+  const submitReject = async (claim: AccountClaim) => {
+    const reason = rejectReason.trim();
+    if (!reason) return;
+    await onRejectUnderProcessClaim(claim, reason);
+    closeRejectBox();
+  };
 
   return (
     <div className="p-4 sm:p-6 pb-24 lg:pb-6 space-y-6">
@@ -331,13 +381,6 @@ function ApproveRefundPage(props: {
           <XCircle size={16} className="flex-shrink-0" /> {actionError}
         </div>
       )}
-
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-        <p className="text-sm font-bold text-amber-900">Fresh export queue</p>
-        <p className="text-xs text-amber-700 mt-1">
-          Export includes name, roll number, email, account number, IFSC code, and one total row per student.
-        </p>
-      </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
         <input
@@ -403,26 +446,11 @@ function ApproveRefundPage(props: {
                 </div>
                 <div className="mt-3 flex items-center gap-2 pt-3 border-t border-slate-100">
                   <button
-                    onClick={() => { setProcessingId(claim._id); onMarkClaimRefunded(claim._id); }}
-                    disabled={processingId === claim._id}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl text-xs font-bold disabled:opacity-50 border border-green-200"
-                  >
-                    {processingId === claim._id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-                    Refunded
-                  </button>
-                  <button
-                    onClick={() => { setProcessingId(claim._id); onRejectClaim(claim._id); }}
-                    disabled={processingId === claim._id}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-bold disabled:opacity-50 border border-red-200"
-                  >
-                    {processingId === claim._id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
-                    Reject
-                  </button>
-                  <button
                     onClick={() => setSelectedClaim(claim)}
-                    className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold border border-slate-200"
                   >
                     <Eye size={13} />
+                    View
                   </button>
                 </div>
               </div>
@@ -435,7 +463,7 @@ function ApproveRefundPage(props: {
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Claim ID', 'Student', 'Dept', 'Account Number', 'IFSC', 'Amount', 'Action'].map((head) => (
-                    <th key={head} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    <th key={head} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {head}
                     </th>
                   ))}
@@ -444,21 +472,21 @@ function ApproveRefundPage(props: {
               <tbody className="divide-y divide-slate-100">
                 {filteredPending.map((claim) => (
                   <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
+                    <td className="px-4 py-4 text-center">
                       <p className="font-semibold text-slate-700 text-sm">{claim.studentName}</p>
                       <p className="text-xs text-slate-400">{claim.studentRoll} · {claim.studentEmail}</p>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${deptBadge[claim.department] ?? ''}`}>
                         {deptLabel[claim.department] ?? claim.department}
                       </span>
                     </td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">{claim.accountNumber || '—'}</td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-600 whitespace-nowrap">{claim.ifscCode || '—'}</td>
-                    <td className="px-4 py-4 font-black text-emerald-700 whitespace-nowrap">₹{claim.amount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-600 whitespace-nowrap">{claim.accountNumber || '—'}</td>
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-600 whitespace-nowrap">{claim.ifscCode || '—'}</td>
+                    <td className="px-4 py-4 text-center font-black text-emerald-700 whitespace-nowrap">₹{claim.amount.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => { setProcessingId(claim._id); onMarkClaimRefunded(claim._id); }}
                           disabled={processingId === claim._id}
@@ -493,19 +521,30 @@ function ApproveRefundPage(props: {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-800">Under Process</h3>
-            <p className="text-slate-500 text-sm">Batches already exported to bank and hidden from fresh exports</p>
+            <p className="text-slate-500 text-sm">Search a student here, flag payment issues on hold, then refund the rest of the batch.</p>
           </div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-100 text-sky-700 rounded-xl text-sm font-bold">
             <Clock size={14} /> {underProcessBatches.length} batches
           </span>
         </div>
 
+        <input
+          value={underProcessSearch}
+          onChange={(e) => setUnderProcessSearch(e.target.value)}
+          placeholder="Search under-process student, roll no, claim ID, account no, IFSC…"
+          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-400"
+        />
+
         {underProcessBatches.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-12 text-center text-slate-400">
             No batches are under process right now.
           </div>
+        ) : visibleUnderProcessBatches.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm py-12 text-center text-slate-400">
+            No under-process claims match this search.
+          </div>
         ) : (
-          underProcessBatches.map((batch) => (
+          visibleUnderProcessBatches.map((batch) => (
             <div key={batch.batchId} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
@@ -514,24 +553,43 @@ function ApproveRefundPage(props: {
                   <p className="text-sm text-slate-500 mt-1">
                     {batch.claimCount} claims · {batch.studentCount} students · Exported {batch.exportedAt ? new Date(batch.exportedAt).toLocaleString('en-IN') : '—'}
                   </p>
+                  {batch.claims.filter((claim) => claim.accountsBatchStatus === 'ON_HOLD').length > 0 && (
+                    <p className="text-xs font-semibold text-amber-700 mt-2">
+                      {batch.claims.filter((claim) => claim.accountsBatchStatus === 'ON_HOLD').length} claim(s) will remain on hold.
+                    </p>
+                  )}
                 </div>
                 <button
-                  onClick={() => onMarkBatchRefunded(batch.batchId)}
+                  onClick={() => onMarkBatchRefunded(batch.batchId, batch.claims.filter((claim) => claim.accountsBatchStatus === 'ON_HOLD').map((claim) => claim._id))}
                   disabled={refundingBatchId === batch.batchId}
                   className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold disabled:opacity-50"
                 >
                   {refundingBatchId === batch.batchId ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  {refundingBatchId === batch.batchId ? 'Updating…' : 'Mark Full Batch Refunded'}
+                  {refundingBatchId === batch.batchId ? 'Updating…' : 'Mark Refunded'}
                 </button>
               </div>
 
               {/* Batch claims — mobile cards */}
               <div className="mt-4 space-y-2 lg:hidden">
                 {batch.claims.map((claim) => (
-                  <div key={claim._id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <div
+                    key={claim._id}
+                    className={`rounded-xl p-3 border ${
+                      claim.accountsBatchStatus === 'ON_HOLD'
+                        ? 'bg-amber-50 border-amber-200'
+                        : 'bg-slate-50 border-slate-100'
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-700">{claim.studentName}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-slate-700">{claim.studentName}</p>
+                          {claim.accountsBatchStatus === 'ON_HOLD' && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                              On Hold
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-400">{claim.studentRoll}</p>
                       </div>
                       <p className="font-bold text-slate-700 flex-shrink-0 ml-2">₹{claim.amount.toLocaleString('en-IN')}</p>
@@ -546,6 +604,44 @@ function ApproveRefundPage(props: {
                         <p className="text-xs font-mono text-slate-600">{claim.ifscCode || '—'}</p>
                       </div>
                     </div>
+                    {(claim.accountsHoldFlaggedByName || claim.accountsHoldReason) && (
+                      <p className="text-xs text-amber-700 mt-2">
+                        {claim.accountsHoldReason || `Held by ${claim.accountsHoldFlaggedByName}`}
+                      </p>
+                    )}
+                    <div className="mt-2">
+                      <button
+                        onClick={() => openRejectBox(claim)}
+                        className="w-full py-2 rounded-xl text-xs font-bold border bg-red-50 border-red-200 text-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                    {rejectingClaimId === claim._id && (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-white p-3 space-y-2">
+                        <textarea
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Type the rejection reason for the student..."
+                          className="w-full min-h-24 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => submitReject(claim)}
+                            disabled={!rejectReason.trim() || processingId === claim._id}
+                            className="flex-1 py-2 rounded-lg text-xs font-bold bg-red-600 text-white disabled:opacity-50"
+                          >
+                            Submit
+                          </button>
+                          <button
+                            onClick={closeRejectBox}
+                            className="flex-1 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -555,8 +651,8 @@ function ApproveRefundPage(props: {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100">
-                      {['Student', 'Account Number', 'IFSC', 'Amount'].map((head) => (
-                        <th key={head} className="text-left py-2 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                      {['Student', 'Account Number', 'IFSC', 'Amount', 'Action'].map((head) => (
+                        <th key={head} className="py-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                           {head}
                         </th>
                       ))}
@@ -564,15 +660,66 @@ function ApproveRefundPage(props: {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {batch.claims.map((claim) => (
-                      <tr key={claim._id}>
-                        <td className="py-3">
-                          <p className="text-sm font-semibold text-slate-700">{claim.studentName}</p>
+                      <React.Fragment key={claim._id}>
+                      <tr className={claim.accountsBatchStatus === 'ON_HOLD' ? 'bg-amber-50' : ''}>
+                        <td className="py-3 text-center">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-slate-700">{claim.studentName}</p>
+                            {claim.accountsBatchStatus === 'ON_HOLD' && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                                On Hold
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-slate-400">{claim.studentRoll}</p>
+                          {(claim.accountsHoldFlaggedByName || claim.accountsHoldReason) && (
+                            <p className="text-xs text-amber-700 mt-1">
+                              {claim.accountsHoldReason || `Held by ${claim.accountsHoldFlaggedByName}`}
+                            </p>
+                          )}
                         </td>
                         <td className="py-3 font-mono text-xs text-slate-600">{claim.accountNumber || '—'}</td>
                         <td className="py-3 font-mono text-xs text-slate-600">{claim.ifscCode || '—'}</td>
                         <td className="py-3 font-bold text-slate-700">₹{claim.amount.toLocaleString('en-IN')}</td>
+                        <td className="py-3">
+                          <button
+                            onClick={() => openRejectBox(claim)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-red-50 border-red-200 text-red-700"
+                          >
+                            Reject
+                          </button>
+                        </td>
                       </tr>
+                      {rejectingClaimId === claim._id && (
+                      <tr>
+                        <td colSpan={5} className="pb-3">
+                          <div className="rounded-xl border border-red-200 bg-white p-3 space-y-2">
+                            <textarea
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              placeholder="Type the rejection reason for the student..."
+                              className="w-full min-h-24 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-300"
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => submitReject(claim)}
+                                disabled={!rejectReason.trim() || processingId === claim._id}
+                                className="px-4 py-2 rounded-lg text-xs font-bold bg-red-600 text-white disabled:opacity-50"
+                              >
+                                Submit
+                              </button>
+                              <button
+                                onClick={closeRejectBox}
+                                className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      )}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -688,7 +835,7 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
                   {['Claim ID', 'Student', 'Dept', 'Amount', 'Batch/Ref', 'Refunded On'].map((head) => (
-                    <th key={head} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                    <th key={head} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                       {head}
                     </th>
                   ))}
@@ -697,19 +844,19 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((row) => (
                   <tr key={row._id} className="hover:bg-slate-50">
-                    <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{row.claimId}</td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{row.claimId}</td>
+                    <td className="px-4 py-4 text-center">
                       <p className="font-semibold text-slate-700 text-sm">{row.studentName}</p>
                       <p className="text-xs text-slate-400">{row.studentRoll}</p>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4 text-center">
                       <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${deptBadge[row.department] ?? ''}`}>
                         {deptLabel[row.department] ?? row.department}
                       </span>
                     </td>
-                    <td className="px-4 py-4 font-black text-emerald-700 whitespace-nowrap">₹{row.amount.toLocaleString('en-IN')}</td>
-                    <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{row.transactionRef}</td>
-                    <td className="px-4 py-4 text-xs text-slate-400 whitespace-nowrap">{new Date(row.refundedAt).toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-4 text-center font-black text-emerald-700 whitespace-nowrap">₹{row.amount.toLocaleString('en-IN')}</td>
+                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{row.transactionRef}</td>
+                    <td className="px-4 py-4 text-center text-xs text-slate-400 whitespace-nowrap">{new Date(row.refundedAt).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -836,7 +983,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
     }
   };
 
-  const handleMarkBatchRefunded = async (batchId: string) => {
+  const handleMarkBatchRefunded = async (batchId: string, holdClaimIds: string[]) => {
     if (!user?._id) return;
     setRefundingBatchId(batchId);
     setActionError('');
@@ -844,7 +991,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
       const res = await fetch(`${BASE}/api/verify/accounts/batches/${batchId}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refundedBy: user._id, refundedByName: user.fullName, notes: '' }),
+        body: JSON.stringify({ refundedBy: user._id, refundedByName: user.fullName, notes: '', holdClaimIds }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to mark batch refunded.');
@@ -899,6 +1046,31 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
     }
   };
 
+  const handleRejectUnderProcessClaim = async (claim: AccountClaim, reason: string) => {
+    if (!user?._id) return;
+    setProcessingId(claim._id);
+    setActionError('');
+    try {
+      const res = await fetch(`${BASE}/api/verify/claims/${claim._id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rejectedBy: user._id,
+          rejectedByName: user.fullName,
+          rejectionReason: reason.trim(),
+          stage: 'ACCOUNTS_PROCESSING',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to reject claim.');
+      await loadClaims();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to reject claim.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const navItems = [
     { id: 'overview', label: 'Overview',        icon: Home },
     { id: 'approve',  label: 'Approve Refunds', icon: CheckSquare },
@@ -915,7 +1087,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
       onLogout={onLogout}
       user={user}
       title="Accounts Department"
-      subtitle="Batch-based refund processing"
+      subtitle=""
     >
       {activeView === 'overview' && (
         claimsLoading || historyLoading
@@ -934,6 +1106,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
               onMarkBatchRefunded={handleMarkBatchRefunded}
               onMarkClaimRefunded={handleMarkClaimRefunded}
               onRejectClaim={handleRejectClaim}
+              onRejectUnderProcessClaim={handleRejectUnderProcessClaim}
               exportLoading={exportLoading}
               refundingBatchId={refundingBatchId}
               actionError={actionError}
@@ -952,7 +1125,27 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
         <SecretaryProfileView
           user={user}
           department="account"
-          onSave={(data) => setUser((prev) => prev ? { ...prev, ...data } : prev)}
+          onSave={async (data, passwordData) => {
+            if (!user) return;
+
+            if (passwordData) {
+              await apiService.changePassword(
+                user._id,
+                passwordData.currentPassword,
+                passwordData.newPassword,
+              );
+              return;
+            }
+
+            const payload = {
+              fullName: data.fullName ?? user.fullName,
+              email: data.email ?? user.email,
+              phone: data.phone ?? user.phone,
+              designation: data.designation ?? user.designation,
+            };
+            const result = await apiService.updateUserData(user._id, payload);
+            setUser((prev) => (prev ? { ...prev, ...result.user } : prev));
+          }}
         />
       )}
     </SecretaryLayout>

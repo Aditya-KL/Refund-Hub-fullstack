@@ -126,27 +126,25 @@ async function checkMonthlyClaimLimit(userId, maxPerMonth) {
 /**
  * POST /api/claims/mess
  * Body (multipart/form-data):
- *   studentId, fromDate, toDate, reason
- *   files: receiptFiles[] (optional)
+ * studentId, fromDate, toDate, reason
+ * files: receiptFiles[] (optional)
  */
 async function submitMessRebate(req, res) {
   // Portal guard
- const guard = await checkPortalGuard('MESS');
+  const guard = await checkPortalGuard('MESS');
   if (guard.blocked) return res.status(503).json({ message: guard.message });
 
   const settings = guard.settings;
 
-  // Dynamic multer using current maxFileUploadMB
   const upload = buildUploadMiddleware(settings.maxFileUploadMB);
   const uploadMiddleware = upload.array('receiptFiles', 5);
 
-  // Wrap with timeout to prevent hanging on Cloudinary uploads
-  const UPLOAD_TIMEOUT = 30000; // 30 seconds
+  const UPLOAD_TIMEOUT = 30000;
   let uploadCompleted = false;
   const timeoutHandle = setTimeout(() => {
     if (!uploadCompleted && !res.headersSent) {
       console.error('[Mess] Upload timeout after 30 seconds');
-      return res.status(408).json({ message: 'File upload timed out. Please check your connection and try again.' });
+      return res.status(408).json({ message: 'File upload timed out. Please try again.' });
     }
   }, UPLOAD_TIMEOUT);
 
@@ -155,7 +153,6 @@ async function submitMessRebate(req, res) {
     clearTimeout(timeoutHandle);
     
     if (err) {
-      console.error('[Mess] Multer/Cloudinary Error:', err.code, err.message);
       return res.status(400).json({ message: getUploadErrorMessage(err) });
     }
 
@@ -165,54 +162,95 @@ async function submitMessRebate(req, res) {
       const user = await User.findOne({ studentId: String(studentId).toUpperCase() });
       if (!user) return res.status(404).json({ message: 'User not found.' });
 
-      // Monthly claim limit
       const overLimit = await checkMonthlyClaimLimit(user._id, settings.maxClaimsPerMonth);
       if (overLimit) {
-        return res.status(429).json({
-          message: `You have reached the monthly claim limit of ${settings.maxClaimsPerMonth} claims.`,
-        });
+        return res.status(429).json({ message: `Monthly claim limit of ${settings.maxClaimsPerMonth} reached.` });
       }
 
       const absenceFrom = fromDate ? new Date(fromDate) : null;
       const absenceTo = toDate ? new Date(toDate) : null;
 
-      // --- NEW MESS TIMELINE CHECK ---
+      // --- 1. BASIC TIMELINE CHECKS ---
       const minFromDate = new Date();
-      minFromDate.setHours(0, 0, 0, 0); // Start of today
+      minFromDate.setHours(0, 0, 0, 0);
       minFromDate.setDate(minFromDate.getDate() + (settings.messAdvanceNoticeDays || 0));
 
       if (absenceFrom && absenceFrom < minFromDate) {
         return res.status(400).json({ message: `Mess rebates require at least ${settings.messAdvanceNoticeDays} days advance notice.` });
       }
 
-      if (!absenceFrom || isNaN(absenceFrom.getTime()))
-        return res.status(400).json({ message: 'Valid from date is required.' });
-      if (!absenceTo || isNaN(absenceTo.getTime()))
-        return res.status(400).json({ message: 'Valid to date is required.' });
-      if (absenceFrom > absenceTo)
-        return res.status(400).json({ message: 'To date must be after from date.' });
+      if (!absenceFrom || isNaN(absenceFrom.getTime())) return res.status(400).json({ message: 'Valid from date is required.' });
+      if (!absenceTo || isNaN(absenceTo.getTime())) return res.status(400).json({ message: 'Valid to date is required.' });
+      if (absenceFrom > absenceTo) return res.status(400).json({ message: 'To date must be after from date.' });
 
       const absenceDays = Math.floor((absenceTo - absenceFrom) / 86400000) + 1;
 
-      if (absenceDays < 5)
+      if (absenceDays < 5) {
         return res.status(400).json({ message: 'Mess rebate requires a minimum absence of 5 days.' });
+      }
 
-      if (absenceDays > settings.maxMessRebateDays)
-        return res.status(400).json({
-          message: `Absence period exceeds the maximum allowed ${settings.maxMessRebateDays} days.`,
+      // --- 2. NO DOUBLE DIPPING (OVERLAP CHECK) ---
+      // This physically prevents claiming April 5-10 twice.
+      const overlappingClaim = await RefundRequest.findOne({
+        student: user._id,
+        requestType: 'MESS_REBATE',
+        status: { $ne: 'REJECTED' }, 
+        messAbsenceFrom: { $lte: absenceTo },
+        messAbsenceTo: { $gte: absenceFrom }
+      });
+
+      if (overlappingClaim) {
+        return res.status(400).json({ 
+          message: `These dates overlap with an existing claim (Ref: ${overlappingClaim.claimId}). You cannot claim the same days twice.` 
         });
+      }
 
-      const calculatedAmount = absenceDays * settings.messRebateRateDaily;
+      // --- 3. CUMULATIVE CAP (SOFT LIMIT) ---
+      const semesterStart = settings.semesterStartDate || new Date(0);
+      const totalDaysResult = await RefundRequest.aggregate([
+        {
+          $match: {
+            student: user._id,
+            requestType: 'MESS_REBATE',
+            status: { $ne: 'REJECTED' },
+            createdAt: { $gte: semesterStart }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            // Use effectiveMessDays so we only count days they actually got paid for!
+            totalDays: { $sum: { $ifNull: ["$effectiveMessDays", "$messAbsenceDays"] } }
+          }
+        }
+      ]);
 
-      // Determine status: auto-approve if below threshold
-      const status =
-        calculatedAmount <= settings.autoApproveBelow ? 'APPROVED' : 'PENDING_MESS_MANAGER';
+      const previousTotalDays = totalDaysResult.length > 0 ? totalDaysResult[0].totalDays : 0;
+
+      // Calculate how many days they are ACTUALLY allowed to get paid for
+      const remainingEligibleDays = Math.max(0, settings.maxMessRebateDays - previousTotalDays);
+      const effectiveDays = Math.min(absenceDays, remainingEligibleDays);
+
+      // --- 4. CALCULATE & SAVE CLAIM ---
+      const requestedAmount = absenceDays * settings.messRebateRateDaily;
+      const effectiveAmount = effectiveDays * settings.messRebateRateDaily;
+
+      // Only auto-approve if the effective amount is above 0 and below threshold
+      const status = (effectiveAmount <= settings.autoApproveBelow && effectiveAmount > 0) 
+        ? 'APPROVED' 
+        : 'PENDING_MESS_MANAGER';
 
       const attachments = mapUploadedFilesToAttachments(req.files);
-
-      // Calculate expiry date
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + settings.claimExpiryDays);
+
+      // Create dynamic history comment
+      let historyComment = 'Claim applied';
+      if (effectiveDays < absenceDays) {
+         historyComment = `Semester limit reached. Requested ${absenceDays} days, but only eligible to be paid for ${effectiveDays} days.`;
+      } else if (status === 'APPROVED') {
+         historyComment = `Auto-approved (amount ₹${effectiveAmount} below threshold)`;
+      }
 
       const newClaim = new RefundRequest({
         claimId: createClaimId('MESS'),
@@ -221,24 +259,24 @@ async function submitMessRebate(req, res) {
         requestType: 'MESS_REBATE',
         title: 'Mess Rebate Application',
         description: reason,
-        amount: calculatedAmount,
+        
+        // Save BOTH requested vs actual payable values
+        amount: requestedAmount,
+        effectiveAmount: effectiveAmount,
+        messAbsenceDays: absenceDays,
+        effectiveMessDays: effectiveDays,
+        
         attachments,
         status,
         messAbsenceFrom: absenceFrom,
         messAbsenceTo: absenceTo,
-        messAbsenceDays: absenceDays,
         expiresAt,
-        history: [
-          {
+        history: [{
             action: 'SUBMITTED',
             byUser: user._id,
             byName: user.fullName,
-            comments:
-              status === 'APPROVED'
-                ? `Auto-approved (amount ₹${calculatedAmount} below threshold ₹${settings.autoApproveBelow})`
-                : 'Claim applied',
-          },
-        ],
+            comments: historyComment,
+        }],
       });
 
       await newClaim.save();
@@ -297,28 +335,13 @@ async function submitFestClaim(req, res) {
           isActive: true,
         }).populate('fest');
 
-        const fcMembership = memberships.find(m => m.position === 'FEST_COORDINATOR');
-        if (fcMembership) {
-          // If the student is an FC for this fest, always treat FC as the submitting role.
-          membership = fcMembership;
-        } else if (memberships.length === 1) {
+        if (memberships.length === 1) {
           membership = memberships[0];
         } else if (memberships.length > 1) {
           return res.status(400).json({
             message: 'Please select the exact fest role before submitting this claim.',
           });
         }
-      }
-
-      // Safety: even when a specific memberId was provided, FC role must take precedence if available.
-      if (membership && membership.position !== 'FEST_COORDINATOR') {
-        const fcMembership = await FestMember.findOne({
-          user: user._id,
-          fest: festId,
-          position: 'FEST_COORDINATOR',
-          isActive: true,
-        }).populate('fest');
-        if (fcMembership) membership = fcMembership;
       }
 
       if (!membership) {
@@ -347,26 +370,9 @@ async function submitFestClaim(req, res) {
       const attachments = mapUploadedFilesToAttachments(req.files);
       if (attachments.length === 0) return res.status(400).json({ message: 'At least one document is required for fest claims.' });
 
-      let status = 'PENDING_COORD';
-      if (membership.position === 'FEST_COORDINATOR') {
-        status = 'VERIFIED_FEST';
-      } else if (membership.position === 'COORDINATOR') {
-        status = 'PENDING_FC';
-      } else {
-        status = 'PENDING_COORD';
-      }
+      const status = parsedAmount <= settings.autoApproveBelow ? 'APPROVED' : 'PENDING_COORD';
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + settings.claimExpiryDays);
-
-      const initialVerifications = membership.position === 'FEST_COORDINATOR'
-        ? [{
-            stage: 'FEST_COORDINATOR',
-            verifiedBy: user._id,
-            verifierName: user.fullName,
-            verifiedAt: new Date(),
-            remarks: 'Auto-verified because claim was submitted by Fest Coordinator.',
-          }]
-        : [];
 
       const newClaim = new RefundRequest({
         claimId: createClaimId('FEST'),
@@ -385,18 +391,12 @@ async function submitFestClaim(req, res) {
         description: expenseDescription,
         attachments,
         status,
-        verifications: initialVerifications,
         expiresAt,
         history: [{
             action: 'SUBMITTED',
             byUser: user._id,
             byName: user.fullName,
-            comments:
-              status === 'VERIFIED_FEST'
-                ? 'Auto-verified (submitted by Fest Coordinator).'
-                : status === 'PENDING_FC'
-                  ? 'Claim applied and routed to Fest Coordinator.'
-                  : 'Claim applied and routed for verification.',
+            comments: status === 'APPROVED' ? `Auto-approved (₹${parsedAmount} ≤ ₹${settings.autoApproveBelow})` : 'Claim applied',
         }],
       });
 
@@ -545,11 +545,9 @@ function registerRebateRoutes(app) {
 
 module.exports = {
   registerRebateRoutes,
-  // Export individual handlers if you prefer manual registration
   submitMessRebate,
   submitFestClaim,
   submitMedicalRebate,
-  // Export helpers for testing
   createClaimId,
   mapUploadedFilesToAttachments,
   normalizeClaim,
