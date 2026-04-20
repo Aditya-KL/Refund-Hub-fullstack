@@ -921,55 +921,103 @@ function ApproveReimbursementsPage({
           <p className="text-slate-300 text-sm mt-1">All verified claims have been processed</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  {['Ref ID', 'Student', 'Fest', 'Amount', 'FC Note', 'Action'].map(h => (
-                    <th key={h} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map(claim => (
-                  <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-4 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId ?? '—'}</td>
-                    <td className="px-4 py-4 text-center">
-                      <p className="font-semibold text-slate-700 text-sm text-center">{claim.studentName ?? '—'}</p>
-                      <p className="text-xs text-slate-400 text-center">{claim.studentRoll}</p>
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      {claim.festName && (
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">
-                          {claim.festName}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <span className="font-bold text-violet-700">₹{claim.amount.toLocaleString('en-IN')}</span>
-                    </td>
-                    <td className="px-4 py-4 text-center max-w-[200px]">
-                      <p className="text-xs text-slate-500 truncate">{(claim as any).fcComment ?? '—'}</p>
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => setSelected(claim)}
-                        disabled={actionLoading === claim._id}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-60"
-                      >
-                        {actionLoading === claim._id ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile cards */}
+          <div className="space-y-3 lg:hidden">
+            {filtered.map(claim => (
+              <div key={claim._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 w-full">
+                <div className="flex items-start gap-3 w-full">
+                  <div className="w-10 h-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-bold shrink-0">
+                    {(claim.studentName || '—').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{claim.studentName ?? '—'}</p>
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">{claim.studentRoll ?? '—'}</p>
+                    <p className="text-xs font-mono text-slate-400 mt-0.5 truncate">{claim.claimRefId ?? claim.claimId ?? '—'}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-base font-black text-violet-700">₹{claim.amount.toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  {claim.festName && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">
+                      {claim.festName}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 truncate w-full">
+                  {(claim as any).fcComment ?? '—'}
+                </p>
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 gap-2">
+                  <StatusBadge status={claim.status} />
+                  <button
+                    onClick={() => setSelected(claim)}
+                    disabled={actionLoading === claim._id}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-60"
+                  >
+                    {actionLoading === claim._id ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                    Review
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+
+          {/* Desktop table */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    {['Ref ID', 'Student', 'Fest', 'Amount', 'FC Note', 'Action'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map(claim => (
+                    <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId ?? '—'}</td>
+                      <td className="px-4 py-4">
+                        <p className="font-semibold text-slate-700 text-sm">{claim.studentName ?? '—'}</p>
+                        <p className="text-xs text-slate-400">{claim.studentRoll}</p>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {claim.festName && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">
+                            {claim.festName}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="font-bold text-violet-700">₹{claim.amount.toLocaleString('en-IN')}</span>
+                      </td>
+                      <td className="px-4 py-4 max-w-[200px]">
+                        <p className="text-xs text-slate-500 truncate">{(claim as any).fcComment ?? '—'}</p>
+                <div className="mt-2">
+                  <StatusBadge status={claim.status} />
+                </div>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => setSelected(claim)}
+                          disabled={actionLoading === claim._id}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-60"
+                        >
+                          {actionLoading === claim._id ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {selected && (
@@ -1075,39 +1123,79 @@ function VerifiedPage({
             <p className="text-sm">No claims found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  {['Ref ID', 'Student', 'Fest', 'Amount', 'Status', 'Date', 'Action'].map(h => (
-                    <th key={h} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filtered.map(claim => (
-                  <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3.5 text-center font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId ?? '—'}</td>
-                    <td className="px-4 py-3.5 text-center">
-                      <p className="font-semibold text-slate-700 text-sm text-center">{claim.studentName ?? '—'}</p>
-                      <p className="text-xs text-slate-400 text-center">{claim.studentRoll}</p>
-                    </td>
-                    <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                      <span className="text-xs font-semibold text-violet-600">{claim.festName}</span>
-                    </td>
-                    <td className="px-4 py-3.5 text-center whitespace-nowrap font-bold text-violet-700">
-                      ₹{claim.amount.toLocaleString('en-IN')}
-                    </td>
-                    <td className="px-4 py-3.5 text-center"><div className="flex justify-center"><StatusBadge status={claim.status} /></div></td>
-                    <td className="px-4 py-3.5 text-center text-xs text-slate-400 whitespace-nowrap">
-                      {claim.submittedAt
-                        ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <div className="flex items-center gap-2">
+          <>
+            {/* Mobile cards */}
+            <div className="space-y-3 p-3 lg:hidden">
+              {filtered.map(claim => (
+                <div key={claim._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 w-full">
+                  <div className="flex items-start gap-3 w-full">
+                    <div className="w-10 h-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-bold shrink-0">
+                      {(claim.studentName || '—').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 truncate">{claim.studentName ?? '—'}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 truncate">{claim.studentRoll ?? '—'}</p>
+                      <p className="text-xs font-mono text-slate-400 mt-0.5 truncate">{claim.claimRefId ?? claim.claimId ?? '—'}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {claim.submittedAt
+                          ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                          : '—'}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-base font-black text-violet-700">₹{claim.amount.toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold text-violet-600 shrink-0">{claim.festName || '—'}</span>
+                      <StatusBadge status={claim.status} />
+                    </div>
+                    <button
+                      onClick={() => setSelected(claim)}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors shrink-0"
+                      title="View"
+                    >
+                      <Eye size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    {['Ref ID', 'Student', 'Fest', 'Amount', 'Status', 'Date', 'Action'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filtered.map(claim => (
+                    <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimRefId ?? '—'}</td>
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-slate-700 text-sm">{claim.studentName ?? '—'}</p>
+                        <p className="text-xs text-slate-400">{claim.studentRoll}</p>
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <span className="text-xs font-semibold text-violet-600">{claim.festName}</span>
+                      </td>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-bold text-violet-700">
+                        ₹{claim.amount.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3.5"><StatusBadge status={claim.status} /></td>
+                      <td className="px-4 py-3.5 text-xs text-slate-400 whitespace-nowrap">
+                        {claim.submittedAt
+                          ? new Date(claim.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3.5">
                         <button
                           onClick={() => setSelected(claim)}
                           className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1115,22 +1203,13 @@ function VerifiedPage({
                         >
                           <Eye size={14} />
                         </button>
-                        {claim.status === 'approved' && (
-                          <button
-                            onClick={() => handleUnverify(claim._id)}
-                            className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                            title="Revert to Verified"
-                          >
-                            <RotateCcw size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -1239,10 +1318,10 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   useEffect(() => {
-    const fetchFestData = async (showLoader = false) => {
-      if (showLoader && !didLoadFestDataRef.current) {
-        setFcLoading(true);
-      }
+    const fetchFestData = async (showLoader: boolean) => {
+      // loading bug is updated here: only show full-page loader on initial fetch, not on every auto-refresh poll
+      if (showLoader) setFcLoading(true);
+      if (showLoader) setFcError('');
       try {
         const festRes = await fetch(`${BASE}/api/fests`);
         if (!festRes.ok) throw new Error('Failed to load fests from database.');
@@ -1284,9 +1363,8 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
         console.error('Fest data load error:', e);
         setFcError(e.message || 'Could not load FC data. Check your connection.');
       } finally {
-        if (showLoader) {
-          setFcLoading(false);
-        }
+        // loading bug is updated here: avoid toggling spinner during background refresh
+        if (showLoader) setFcLoading(false);
       }
     };
     fetchFestData(true);
