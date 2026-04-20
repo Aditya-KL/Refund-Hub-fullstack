@@ -4,16 +4,16 @@
 //  Place this file in the same directory as server.js.
 //
 //  Admin settings enforced:
-//    • messRebateRateDaily      → calculates rebate amount
-//    • maxMessRebateDays        → rejects if days exceed limit
-//    • maxFestReimbursement     → caps fest claim amount
-//    • maxMedicalReimbursement  → caps medical claim amount
-//    • maxFileUploadMB          → validated per-file on multer
-//    • autoApproveBelow         → auto-sets status to APPROVED
-//    • maxClaimsPerMonth        → limits submissions per student
-//    • portalActive             → blocks all claims if false
-//    • maintenanceMode          → blocks all claims if true
-//    • claimExpiryDays          → (stored on claim for expiry jobs)
+//    â€¢ messRebateRateDaily      â†’ calculates rebate amount
+//    â€¢ maxMessRebateDays        â†’ rejects if days exceed limit
+//    â€¢ maxFestReimbursement     â†’ caps fest claim amount
+//    â€¢ maxMedicalReimbursement  â†’ caps medical claim amount
+//    â€¢ maxFileUploadMB          â†’ validated per-file on multer
+//    â€¢ autoApproveBelow         â†’ auto-sets status to APPROVED
+//    â€¢ maxClaimsPerMonth        â†’ limits submissions per student
+//    â€¢ portalActive             â†’ blocks all claims if false
+//    â€¢ maintenanceMode          â†’ blocks all claims if true
+//    â€¢ claimExpiryDays          â†’ (stored on claim for expiry jobs)
 // ============================================================
 
 const mongoose = require('mongoose');
@@ -25,7 +25,7 @@ const RefundRequest = require('./models/refundRequest');
 const User = require('./models/user');
 const { FestMember } = require('./models/fest');
 
-// ─── Cloudinary / Multer Setup (driven by admin settings) ────
+// â”€â”€â”€ Cloudinary / Multer Setup (driven by admin settings) â”€â”€â”€â”€
 
 /**
  * Build a fresh multer upload middleware using current admin settings.
@@ -58,7 +58,7 @@ function buildUploadMiddleware(maxFileMB = 10) {
   });
 }
 
-// ─── Shared Helpers ───────────────────────────────────────────
+// â”€â”€â”€ Shared Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const createClaimId = (prefix = 'CLM') => {
   const year = new Date().getFullYear();
@@ -121,7 +121,7 @@ async function checkMonthlyClaimLimit(userId, maxPerMonth) {
   return count >= maxPerMonth;
 }
 
-// ─── Route Handlers ───────────────────────────────────────────
+// â”€â”€â”€ Route Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * POST /api/claims/mess
@@ -249,7 +249,7 @@ async function submitMessRebate(req, res) {
       if (effectiveDays < absenceDays) {
          historyComment = `Semester limit reached. Requested ${absenceDays} days, but only eligible to be paid for ${effectiveDays} days.`;
       } else if (status === 'APPROVED') {
-         historyComment = `Auto-approved (amount ₹${effectiveAmount} below threshold)`;
+         historyComment = `Auto-approved (amount â‚¹${effectiveAmount} below threshold)`;
       }
 
       const newClaim = new RefundRequest({
@@ -316,7 +316,7 @@ async function submitFestClaim(req, res) {
       const user = await User.findOne({ studentId: String(studentId).toUpperCase() });
       if (!user) return res.status(404).json({ message: 'User not found.' });
 
-      // ── Fest membership check (server-side guard) ──
+      // â”€â”€ Fest membership check (server-side guard) â”€â”€
       // Verify they belong to this specific fest and grab their committee
       let membership = null;
       if (festMemberId && mongoose.Types.ObjectId.isValid(festMemberId)) {
@@ -335,13 +335,28 @@ async function submitFestClaim(req, res) {
           isActive: true,
         }).populate('fest');
 
-        if (memberships.length === 1) {
+        const fcMembership = memberships.find(m => m.position === 'FEST_COORDINATOR');
+        if (fcMembership) {
+          // If the student is an FC for this fest, always treat FC as the submitting role.
+          membership = fcMembership;
+        } else if (memberships.length === 1) {
           membership = memberships[0];
         } else if (memberships.length > 1) {
           return res.status(400).json({
             message: 'Please select the exact fest role before submitting this claim.',
           });
         }
+      }
+
+      // Safety: even when a specific memberId was provided, FC role must take precedence if available.
+      if (membership && membership.position !== 'FEST_COORDINATOR') {
+        const fcMembership = await FestMember.findOne({
+          user: user._id,
+          fest: festId,
+          position: 'FEST_COORDINATOR',
+          isActive: true,
+        }).populate('fest');
+        if (fcMembership) membership = fcMembership;
       }
 
       if (!membership) {
@@ -364,15 +379,32 @@ async function submitFestClaim(req, res) {
       const parsedAmount = parseFloat(expenseAmount);
       if (isNaN(parsedAmount) || parsedAmount <= 0) return res.status(400).json({ message: 'Valid expense amount is required.' });
       if (parsedAmount > settings.maxFestReimbursement) {
-        return res.status(400).json({ message: `Amount exceeds maximum fest reimbursement of ₹${settings.maxFestReimbursement.toLocaleString()}.` });
+        return res.status(400).json({ message: `Amount exceeds maximum fest reimbursement of â‚¹${settings.maxFestReimbursement.toLocaleString()}.` });
       }
 
       const attachments = mapUploadedFilesToAttachments(req.files);
       if (attachments.length === 0) return res.status(400).json({ message: 'At least one document is required for fest claims.' });
 
-      const status = parsedAmount <= settings.autoApproveBelow ? 'APPROVED' : 'PENDING_COORD';
+      let status = 'PENDING_COORD';
+      if (membership.position === 'FEST_COORDINATOR') {
+        status = 'VERIFIED_FEST';
+      } else if (membership.position === 'COORDINATOR') {
+        status = 'PENDING_FC';
+      } else {
+        status = 'PENDING_COORD';
+      }
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + settings.claimExpiryDays);
+
+      const initialVerifications = membership.position === 'FEST_COORDINATOR'
+        ? [{
+            stage: 'FEST_COORDINATOR',
+            verifiedBy: user._id,
+            verifierName: user.fullName,
+            verifiedAt: new Date(),
+            remarks: 'Auto-verified because claim was submitted by Fest Coordinator.',
+          }]
+        : [];
 
       const newClaim = new RefundRequest({
         claimId: createClaimId('FEST'),
@@ -391,12 +423,18 @@ async function submitFestClaim(req, res) {
         description: expenseDescription,
         attachments,
         status,
+        verifications: initialVerifications,
         expiresAt,
         history: [{
             action: 'SUBMITTED',
             byUser: user._id,
             byName: user.fullName,
-            comments: status === 'APPROVED' ? `Auto-approved (₹${parsedAmount} ≤ ₹${settings.autoApproveBelow})` : 'Claim applied',
+            comments:
+              status === 'VERIFIED_FEST'
+                ? 'Auto-verified (submitted by Fest Coordinator).'
+                : status === 'PENDING_FC'
+                  ? 'Claim applied and routed to Fest Coordinator.'
+                  : 'Claim applied and routed for verification.',
         }],
       });
 
@@ -478,7 +516,7 @@ async function submitMedicalRebate(req, res) {
 
       if (parsedAmount > settings.maxMedicalReimbursement) {
         return res.status(400).json({
-          message: `Amount exceeds maximum medical reimbursement of ₹${settings.maxMedicalReimbursement.toLocaleString()}.`,
+          message: `Amount exceeds maximum medical reimbursement of â‚¹${settings.maxMedicalReimbursement.toLocaleString()}.`,
         });
       }
 
@@ -514,7 +552,7 @@ async function submitMedicalRebate(req, res) {
             byName: user.fullName,
             comments:
               status === 'APPROVED'
-                ? `Auto-approved (₹${parsedAmount} ≤ ₹${settings.autoApproveBelow})`
+                ? `Auto-approved (â‚¹${parsedAmount} â‰¤ â‚¹${settings.autoApproveBelow})`
                 : 'Claim applied',
           },
         ],
@@ -529,7 +567,7 @@ async function submitMedicalRebate(req, res) {
   });
 }
 
-// ─── Register all rebate routes on an Express app/router ─────
+// â”€â”€â”€ Register all rebate routes on an Express app/router â”€â”€â”€â”€â”€
 
 /**
  * Call this from server.js:
