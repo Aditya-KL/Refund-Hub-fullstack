@@ -1430,7 +1430,3 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
     </SecretaryLayout>
   );
 }
-
-
-
-
