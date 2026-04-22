@@ -785,4 +785,3 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
     </div>
   );
 }
-**
