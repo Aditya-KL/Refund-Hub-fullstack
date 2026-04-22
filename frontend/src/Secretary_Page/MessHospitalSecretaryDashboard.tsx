@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Home, ClipboardList, Archive, User,
   TrendingUp, Clock, CheckCircle, DollarSign,
@@ -11,9 +11,12 @@ import {
   type Claim, type SecretaryUser, type Department,
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
+import { useHistoryView } from '../hooks/useHistoryView';
 
 // ─── API Base ────────────────────────────────────────────────────────────────
 const BASE = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
+type SecretaryShellView = 'overview' | 'claims' | 'verified' | 'profile';
+const SECRETARY_SHELL_VIEWS: SecretaryShellView[] = ['overview', 'claims', 'verified', 'profile'];
 
 // ─── Map backend status → frontend status ────────────────────────────────────
 function mapStatus(s: string): string {
@@ -923,7 +926,25 @@ function SecretaryDashboardShell({
   title: string;
   subtitle: string;
 }) {
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, navigateShellView] = useHistoryView<SecretaryShellView>({
+    stateKey: `${department}SecretaryView`,
+    defaultView: 'overview',
+    validViews: SECRETARY_SHELL_VIEWS,
+    buildHash: (view) => `#/app/secretary/${department}/${view}`,
+    parseHash: (hash) => {
+      const match = hash.match(/^#\/app\/secretary\/([^/?#]+)\/([^/?#]+)/);
+      if (!match || match[1] !== department) return null;
+      const view = match[2];
+      return view && SECRETARY_SHELL_VIEWS.includes(view as SecretaryShellView)
+        ? (view as SecretaryShellView)
+        : null;
+    },
+  });
+  const navigateView = (view: string) => {
+    if (SECRETARY_SHELL_VIEWS.includes(view as SecretaryShellView)) {
+      navigateShellView(view as SecretaryShellView);
+    }
+  };
   const [user, setUser] = useState<SecretaryUser | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [claimsLoading, setClaimsLoading] = useState(true);
@@ -1024,7 +1045,7 @@ function SecretaryDashboardShell({
       department={department}
       navItems={navItems}
       activeView={activeView}
-      setActiveView={setActiveView}
+      setActiveView={navigateView}
       onLogout={onLogout}
       user={user ?? makeFallbackUser(department)}
       title={title}
