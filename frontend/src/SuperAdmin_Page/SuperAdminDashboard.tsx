@@ -10,6 +10,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { PortalSettingsView } from './PortalSettingsView';
 import { ProfileView } from './ProfileView';
 import { apiService } from '../services/db_service';
+import { useHistoryView } from '../hooks/useHistoryView';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getTimeAgo(dateString: string | null | undefined) {
@@ -41,6 +42,8 @@ function isUserOnline(lastLogin: string | null | undefined): boolean {
 }
 
 interface SuperAdminDashboardProps { onLogout: () => void; }
+type SuperAdminView = 'overview' | 'audit' | 'settings' | 'profile';
+const SUPER_ADMIN_VIEWS: SuperAdminView[] = ['overview', 'audit', 'settings', 'profile'];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Secretary {
@@ -743,7 +746,22 @@ function BottomNav({ activeView, setActiveView }: { activeView: string; setActiv
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, navigateSuperAdminView] = useHistoryView<SuperAdminView>({
+    stateKey: 'superAdminView',
+    defaultView: 'overview',
+    validViews: SUPER_ADMIN_VIEWS,
+    buildHash: (view) => `#/app/super-admin/${view}`,
+    parseHash: (hash) => {
+      const match = hash.match(/^#\/app\/super-admin\/([^/?#]+)/);
+      const view = match?.[1];
+      return view && SUPER_ADMIN_VIEWS.includes(view as SuperAdminView) ? (view as SuperAdminView) : null;
+    },
+  });
+  const navigateView = (view: string) => {
+    if (SUPER_ADMIN_VIEWS.includes(view as SuperAdminView)) {
+      navigateSuperAdminView(view as SuperAdminView);
+    }
+  };
   const [portalActive, setPortalActive] = useState(true);
   const [showManageModal, setShowManageModal] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1099,7 +1117,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           {menuItems.map(item => {
             const Icon = item.icon;
             return (
-              <button key={item.id} onClick={() => setActiveView(item.id)}
+              <button key={item.id} onClick={() => navigateView(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${activeView === item.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30' : 'text-slate-400 hover:bg-slate-700/60 hover:text-white'}`}>
                 <Icon size={18} /><span className="font-medium text-sm">{item.label}</span>
               </button>
@@ -1134,7 +1152,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
               {menuItems.map(item => {
                 const Icon = item.icon;
                 return (
-                  <button key={item.id} onClick={() => { setActiveView(item.id); setMobileMenuOpen(false); }}
+                  <button key={item.id} onClick={() => { navigateView(item.id); setMobileMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all text-left ${activeView === item.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-700/60 hover:text-white'}`}>
                     <Icon size={19} /><span className="font-medium">{item.label}</span>
                   </button>
@@ -1445,7 +1463,7 @@ export function SuperAdminDashboard({ onLogout }: SuperAdminDashboardProps) {
           {activeView === 'profile' && <ProfileView onLogout={onLogout} />}
         </div>
 
-        <BottomNav activeView={activeView} setActiveView={setActiveView} />
+        <BottomNav activeView={activeView} setActiveView={navigateView} />
       </main>
 
       {showManageModal && <ManageSecretariesModal onClose={() => setShowManageModal(false)} />}
