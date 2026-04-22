@@ -8,8 +8,11 @@ import {
   type SecretaryUser, type Department,
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
+import { useHistoryView } from '../hooks/useHistoryView';
 
 const BASE = import.meta.env.VITE_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+type AccountsView = 'overview' | 'approve' | 'history' | 'profile';
+const ACCOUNTS_VIEWS: AccountsView[] = ['overview', 'approve', 'history', 'profile'];
 
 const deptBadge: Record<string, string> = {
   fest: 'bg-violet-100 text-violet-700',
@@ -853,7 +856,22 @@ function RefundHistoryPage({ history }: { history: RefundRecord[] }) {
 }
 
 export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, navigateAccountsView] = useHistoryView<AccountsView>({
+    stateKey: 'secretaryAccountsView',
+    defaultView: 'overview',
+    validViews: ACCOUNTS_VIEWS,
+    buildHash: (view) => `#/app/secretary/account/${view}`,
+    parseHash: (hash) => {
+      const match = hash.match(/^#\/app\/secretary\/account\/([^/?#]+)/);
+      const view = match?.[1];
+      return view && ACCOUNTS_VIEWS.includes(view as AccountsView) ? (view as AccountsView) : null;
+    },
+  });
+  const navigateView = (view: string) => {
+    if (ACCOUNTS_VIEWS.includes(view as AccountsView)) {
+      navigateAccountsView(view as AccountsView);
+    }
+  };
   const [user, setUser] = useState<SecretaryUser | null>(null);
   const [pendingClaims, setPendingClaims] = useState<AccountClaim[]>([]);
   const [underProcessClaims, setUnderProcessClaims] = useState<AccountClaim[]>([]);
@@ -1067,7 +1085,7 @@ export function AccountsSecretaryDashboard({ onLogout }: { onLogout: () => void 
       department="account"
       navItems={navItems}
       activeView={activeView}
-      setActiveView={setActiveView}
+      setActiveView={navigateView}
       onLogout={onLogout}
       user={user}
       title="Accounts Department"
