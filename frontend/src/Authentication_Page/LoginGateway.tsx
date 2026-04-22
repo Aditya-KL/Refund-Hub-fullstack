@@ -75,7 +75,7 @@ export function LoginGateway({ onLoginClick, onRegisterClick }: LoginGatewayProp
         <div className="text-center mt-6">
           <p className="text-sm text-gray-500">
             Need help? Contact{' '}
-            <a href="#" className="text-green-600 hover:text-green-700 font-semibold">
+            <a href="mailto:refundhub.verify@gmail.com" className="text-green-600 hover:text-green-700 font-semibold">
               refundhub.verify@gmail.com
             </a>
           </p>
