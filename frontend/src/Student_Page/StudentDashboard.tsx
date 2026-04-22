@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, DollarSign, Clock, CheckCircle, Home, FileText, User, Users, Shield } from 'lucide-react';
+import { useHistoryView } from '../hooks/useHistoryView';
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
 
 // Layout
@@ -44,6 +45,25 @@ interface UserFest {
 interface StudentDashboardProps {
   onLogout: () => void;
 }
+
+type StudentView =
+  | 'dashboard'
+  | 'claims'
+  | 'history'
+  | 'manage-team'
+  | 'approve-reimbursement'
+  | 'profile'
+  | 'settings';
+
+const STUDENT_VIEWS: StudentView[] = [
+  'dashboard',
+  'claims',
+  'history',
+  'manage-team',
+  'approve-reimbursement',
+  'profile',
+  'settings',
+];
 
 // ─── Bottom Nav Component (Mobile) ────────────────────────────────────────
 function BottomNav({ 
@@ -111,7 +131,22 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   };
 
   // ── Navigation ──
-  const [activeMenuItem, setActiveMenuItem] = useState('dashboard');
+  const [activeMenuItem, navigateMenuItem] = useHistoryView<StudentView>({
+    stateKey: 'studentView',
+    defaultView: 'dashboard',
+    validViews: STUDENT_VIEWS,
+    buildHash: (view) => `#/app/student/${view}`,
+    parseHash: (hash) => {
+      const match = hash.match(/^#\/app\/student\/([^/?#]+)/);
+      const view = match?.[1];
+      return view && STUDENT_VIEWS.includes(view as StudentView) ? (view as StudentView) : null;
+    },
+  });
+  const navigateStudentView = (view: string) => {
+    if (STUDENT_VIEWS.includes(view as StudentView)) {
+      navigateMenuItem(view as StudentView);
+    }
+  };
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // ── Modals & Forms ──
@@ -336,7 +371,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const handleTrackStatus = () => {
     setShowSuccessConfirmation(false);
     setShowFestClaimSuccess(false);
-    setActiveMenuItem('claims');
+    navigateMenuItem('claims');
   };
 
   // ─── Form Submit Handlers ─────────────────────────────────────────────────
@@ -531,7 +566,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       {/* ─── SIDEBAR ─── */}
       <Sidebar
         activeItem={activeMenuItem}
-        onItemClick={setActiveMenuItem}
+        onItemClick={navigateStudentView}
         userRole={effectiveRole}
         mobileOpen={mobileMenuOpen}
         onMobileToggle={() => setMobileMenuOpen(v => !v)}
@@ -594,7 +629,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
                     </div>
                   ) : (
                     dashboardClaims.slice(0, 4).map((claim) => (
-                      <ClaimStatusCard key={claim.id} claim={claim} onClick={() => setActiveMenuItem('claims')} />
+                      <ClaimStatusCard key={claim.id} claim={claim} onClick={() => navigateMenuItem('claims')} />
                     ))
                   )}
                 </div>
@@ -669,12 +704,12 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
 
           {/* ── Profile ── */}
           {activeMenuItem === 'profile' && (
-            <ProfileView onEditClick={() => setActiveMenuItem('settings')} onLogout={onLogout} />
+            <ProfileView onEditClick={() => navigateMenuItem('settings')} onLogout={onLogout} />
           )}
 
           {/* ── Settings ── */}
           {activeMenuItem === 'settings' && (
-            <EditProfile onBack={() => setActiveMenuItem('profile')} onLogout={onLogout} />
+            <EditProfile onBack={() => navigateMenuItem('profile')} onLogout={onLogout} />
           )}
 
           {/* ── Fallback ── */}
@@ -745,7 +780,7 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
       {/* Mobile Bottom Navigation */}
       <BottomNav 
         activeView={activeMenuItem} 
-        setActiveView={setActiveMenuItem}
+        setActiveView={navigateStudentView}
         userRole={effectiveRole}
       />
     </div>
