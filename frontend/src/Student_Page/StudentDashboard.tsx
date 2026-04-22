@@ -520,7 +520,6 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
   const pageTitle =
     activeMenuItem === 'dashboard'             ? 'Dashboard' :
     activeMenuItem === 'claims'                ? 'My Claims' :
-    activeMenuItem === 'refunds'               ? 'Refunds & Settlements' :
     activeMenuItem === 'history'               ? 'Claim History' :
     activeMenuItem === 'manage-team'           ? 'Manage Team' :
     activeMenuItem === 'approve-reimbursement' ? 'Approve Reimbursements' :
@@ -786,3 +785,4 @@ export function StudentDashboard({ onLogout }: StudentDashboardProps) {
     </div>
   );
 }
+**
