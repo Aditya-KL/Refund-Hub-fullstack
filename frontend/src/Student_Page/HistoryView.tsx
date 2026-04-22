@@ -245,19 +245,19 @@ const getStatusBadge = (status: string) => {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Claim ID
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Category
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Date / Period
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Amount
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status
                 </th>
               </tr>
@@ -269,7 +269,7 @@ const getStatusBadge = (status: string) => {
                 const messRange = formatDateRange(claim.messAbsenceFrom, claim.messAbsenceTo);
                 return (
                 <tr key={claim._id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
                     <div>
                       <p className="text-sm font-mono font-semibold text-gray-900">{claim.claimId}</p>
                       <p className="text-xs text-gray-500 mt-0.5 max-w-[200px] truncate">
@@ -277,22 +277,22 @@ const getStatusBadge = (status: string) => {
                       </p>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
                     <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium border text-gray-700 bg-gray-100 border-gray-200">
                       {formatCategory(claim.requestType)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
                     <span className="text-sm text-gray-700">
                       {isMess && messRange
                         ? messRange
                         : new Date(claim.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
                     <span className="text-sm font-semibold text-gray-900">₹{claim.amount.toLocaleString()}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 text-center whitespace-nowrap">
                     {getStatusBadge(claim.status)}
                   </td>
                 </tr>

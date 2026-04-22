@@ -503,7 +503,7 @@ export function ManageTeamView({ userFests, currentUserId, currentUserRollNo }: 
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+        <div className="text-center sm:text-center">
           <h1 className="text-2xl font-bold text-gray-900">Manage Team</h1>
           <p className="text-sm text-gray-500 mt-0.5">{selectedFest?.festName} · {selectedFest?.academicYear}</p>
         </div>
@@ -622,7 +622,7 @@ export function ManageTeamView({ userFests, currentUserId, currentUserRollNo }: 
                   { label: 'Committee', field: 'committee' as SortField },
                 ]).map(col => (
                   <button key={col.field} onClick={() => handleSort(col.field)}
-                    className="flex items-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600 transition-colors text-left">
+                    className="flex items-center justify-center gap-1 text-xs font-bold text-gray-400 uppercase tracking-wide hover:text-gray-600 transition-colors text-center">
                     {col.label} <SortIcon field={col.field} />
                   </button>
                 ))}
@@ -637,29 +637,29 @@ export function ManageTeamView({ userFests, currentUserId, currentUserRollNo }: 
                   const yr = getAcademicYear(member.user.studentId);
                   return (
                     <div key={member._id}
-                      className="grid grid-cols-[2.5rem_1.5fr_1fr_1.2fr_1.2fr_2.5rem] gap-x-4 px-4 py-3 items-center hover:bg-gray-50/60 transition-colors group">
+                      className="grid grid-cols-[3rem_2fr_1fr_1.2fr_1.5fr_3rem] gap-x-4 px-4 py-3 items-center hover:bg-gray-50/60 transition-colors group">
                       {/* Avatar */}
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${cfg.bg} ${cfg.color}`}>
                         {initials(member.user.fullName)}
                       </div>
                       {/* Name */}
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{member.user.fullName}</p>
-                        <p className="text-xs text-gray-400 truncate">{member.user.email}</p>
+                      <div className="min-w-0 text-center">
+                        <p className="text-sm font-semibold text-gray-900 truncate text-center">{member.user.fullName}</p>
+                        <p className="text-xs text-gray-400 truncate text-center">{member.user.email}</p>
                       </div>
                       {/* Roll + year */}
-                      <div className="min-w-0">
-                        <p className="text-sm font-mono text-gray-700 truncate">{member.user.studentId}</p>
+                      <div className="min-w-0 text-center">
+                        <p className="text-sm font-mono text-gray-700 truncate text-center">{member.user.studentId}</p>
                         {yr > 0 && (
-                          <span className="text-xs text-gray-400 flex items-center gap-0.5">
+                          <span className="text-xs text-gray-400 inline-flex items-center justify-center gap-0.5">
                             <GraduationCap size={10} />{yrLabels[yr] ?? `${yr}th`} yr
                           </span>
                         )}
                       </div>
                       {/* Role */}
-                      <div><RolePill role={member.position} /></div>
+                      <div className="flex justify-center"><RolePill role={member.position} /></div>
                       {/* Committee */}
-                      <div>
+                      <div className="flex justify-center">
                         {member.committee
                           ? <CommitteePill name={member.committee} />
                           : <span className="text-xs text-gray-300">—</span>}

@@ -241,9 +241,9 @@ function ClaimCard({
   onReject: (claimId: string) => void;
   loading: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const actorPosition = claim.actorPosition || currentUserPosition;
   const hasCoordinatorVerification = (claim.verifications || []).some(v => v.stage === 'COORDINATOR');
+  const hasAttachments = (claim.attachments?.length || 0) > 0;
 
   const canVerify = (() => {
     if (['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS', 'VERIFIED_COORD', 'VERIFIED_FEST'].includes(claim.status)) return false;
@@ -296,9 +296,28 @@ function ClaimCard({
           {claim.description}
         </p>
 
-        {/* Transaction ID if present */}
-        {claim.transactionId && (
-          <p className="text-xs text-gray-400 mt-1 font-mono">TXN: {claim.transactionId}</p>
+        {/* Transaction + attachments row */}
+        {(claim.transactionId || hasAttachments) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {claim.transactionId && (
+              <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-mono font-semibold text-blue-700 bg-blue-50 border border-blue-200">
+                TXN: {claim.transactionId}
+              </span>
+            )}
+            {hasAttachments && claim.attachments.map((att, i) => (
+              <a
+                key={`${claim._id}-mobile-att-${i}`}
+                href={att.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+              >
+                <FileText size={11} />
+                {claim.attachments.length === 1 ? 'Attachment' : `Attachment ${i + 1}`}
+                <ArrowUpRight size={10} />
+              </a>
+            ))}
+          </div>
         )}
 
         {/* Verification trail */}
@@ -336,15 +355,6 @@ function ClaimCard({
 
         {/* Footer row */}
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between mt-3 pt-3 border-t border-gray-50">
-          <button
-            onClick={() => setExpanded(v => !v)}
-            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 transition-colors w-fit"
-          >
-            <FileText size={12} />
-            {claim.attachments.length} attachment{claim.attachments.length !== 1 ? 's' : ''}
-            <ChevronDown size={12} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
-          </button>
-
           <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
             {canReject && (
               <button
@@ -366,27 +376,6 @@ function ClaimCard({
         </div>
       </div>
 
-      {/* Attachments */}
-      {expanded && claim.attachments.length > 0 && (
-        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-          <p className="text-xs font-semibold text-gray-600 mb-2">Attachments</p>
-          <div className="flex flex-wrap gap-2">
-            {claim.attachments.map((att, i) => (
-              <a
-                key={i}
-                href={att.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-blue-600 hover:text-blue-700 hover:border-blue-300 transition-colors"
-              >
-                <FileText size={11} />
-                {att.filename?.length > 20 ? att.filename.slice(0, 18) + '…' : (att.filename || `Receipt ${i + 1}`)}
-                <ArrowUpRight size={10} />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -404,6 +393,7 @@ export function VerifyReimbursementView({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [festDropdownOpen, setFestDropdownOpen] = useState(false);
+  const [detailsTarget, setDetailsTarget] = useState<FestClaim | null>(null);
 
   // Modals
   const [verifyTarget, setVerifyTarget] = useState<FestClaim | null>(null);
@@ -563,6 +553,77 @@ export function VerifyReimbursementView({
           onConfirm={handleReject}
           onCancel={() => setRejectTargetId(null)}
         />
+      )}
+      {detailsTarget && (
+        <div className="hidden lg:flex fixed inset-0 z-40 items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Claim Details</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{detailsTarget.student.fullName} ({detailsTarget.student.studentId})</p>
+              </div>
+              <button
+                onClick={() => setDetailsTarget(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-400">Claim ID</p>
+                  <p className="font-mono font-semibold text-slate-700 mt-0.5">{detailsTarget.claimId}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-400">Status</p>
+                  <div className="mt-1">
+                    <StatusBadge status={detailsTarget.status} />
+                  </div>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-400">Amount</p>
+                  <p className="font-bold text-violet-700 mt-0.5">Rs. {detailsTarget.amount.toLocaleString('en-IN')}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <p className="text-slate-400">Date</p>
+                  <p className="text-slate-700 mt-0.5">{new Date(detailsTarget.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3 col-span-2">
+                  <p className="text-slate-400">Description</p>
+                  <p className="text-slate-700 mt-0.5">{detailsTarget.description || '-'}</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-3 col-span-2">
+                  <p className="text-slate-400">Transaction ID</p>
+                  <p className="font-mono text-slate-700 mt-0.5">{detailsTarget.transactionId || '-'}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-slate-600 mb-2">Attachments</p>
+                {(detailsTarget.attachments?.length || 0) > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {detailsTarget.attachments.map((att, i) => (
+                      <a
+                        key={`${detailsTarget._id}-${i}`}
+                        href={att.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-blue-700 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                      >
+                        <FileText size={11} />
+                        {att.filename?.trim() || `Attachment ${i + 1}`}
+                        <ArrowUpRight size={11} />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400">No attachments uploaded.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -740,10 +801,10 @@ export function VerifyReimbursementView({
           {/* Desktop table */}
           <div className="hidden lg:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px]">
+              <table className="w-full min-w-[920px]">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    {['Ref ID', 'Student', 'Committee', 'Role', 'Amount', 'Date', 'Status', 'Action'].map(h => (
+                    {['Student', 'Committee', 'Role', 'Amount', 'Date', 'Action'].map(h => (
                       <th
                         key={h}
                         className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap"
@@ -773,12 +834,36 @@ export function VerifyReimbursementView({
                     })();
                     const canReject = !['APPROVED', 'REJECTED', 'REFUNDED', 'PUSHED_TO_ACCOUNTS'].includes(claim.status);
 
+                    const hasAttachments = (claim.attachments?.length || 0) > 0;
+                    const hasDetailTrigger = !!claim.transactionId || hasAttachments;
+
                     return (
                       <tr key={claim._id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3.5 font-mono text-xs text-slate-500 whitespace-nowrap">{claim.claimId}</td>
                         <td className="px-4 py-3.5">
                           <p className="font-semibold text-slate-700 text-sm">{claim.student.fullName}</p>
                           <p className="text-xs text-slate-400">{claim.student.studentId}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {claim.transactionId && (
+                              <button
+                                onClick={() => setDetailsTarget(claim)}
+                                className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-mono font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+                              >
+                                TXN: {claim.transactionId}
+                              </button>
+                            )}
+                            {hasAttachments && (
+                              <button
+                                onClick={() => setDetailsTarget(claim)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                              >
+                                <FileText size={11} />
+                                Attachments ({claim.attachments.length})
+                              </button>
+                            )}
+                            {!hasDetailTrigger && (
+                              <span className="text-[11px] text-slate-400">No transaction or attachments</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-sm text-slate-600 whitespace-nowrap">{claim.claimantCommittee || 'General'}</td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
@@ -789,9 +874,6 @@ export function VerifyReimbursementView({
                         </td>
                         <td className="px-4 py-3.5 text-xs text-slate-500 whitespace-nowrap">
                           {new Date(claim.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <StatusBadge status={claim.status} />
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <div className="flex items-center gap-2">
