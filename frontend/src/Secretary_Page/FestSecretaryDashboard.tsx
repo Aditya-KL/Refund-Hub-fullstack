@@ -12,10 +12,13 @@ import {
   type Claim, type SecretaryUser, type StudentUser,
 } from './SecretaryShared';
 import { apiService } from '../services/db_service';
+import { useHistoryView } from '../hooks/useHistoryView';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type FestName = 'Celesta' | 'Infinito' | 'Anwesha' | 'TedX';
+type FestSecretaryView = 'overview' | 'appoint' | 'approve' | 'history' | 'profile';
 const FESTS: FestName[] = ['Celesta', 'Infinito', 'Anwesha', 'TedX'];
+const FEST_SECRETARY_VIEWS: FestSecretaryView[] = ['overview', 'appoint', 'approve', 'history', 'profile'];
 const festIcons: Record<FestName, any> = { Celesta: Music, Infinito: Zap, Anwesha: Globe, TedX: Mic };
 const festColors: Record<FestName, string> = {
   Celesta: 'from-violet-500 to-purple-600',
@@ -966,7 +969,7 @@ function ApproveReimbursementsPage({
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    {['Ref ID', 'Student', 'Fest', 'Amount', 'FC Note', 'Action'].map(h => (
+                    {['Ref ID', 'Student', 'Fest', 'Amount', 'Status', 'Action'].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                         {h}
                       </th>
@@ -992,7 +995,7 @@ function ApproveReimbursementsPage({
                         <span className="font-bold text-violet-700">₹{claim.amount.toLocaleString('en-IN')}</span>
                       </td>
                       <td className="px-4 py-4 max-w-[200px]">
-                        <p className="text-xs text-slate-500 truncate">{(claim as any).fcComment ?? '—'}</p>
+                        {/* <p className="text-xs text-slate-500 truncate">{(claim as any).fcComment ?? '—'}</p> */}
                 <div className="mt-2">
                   <StatusBadge status={claim.status} />
                 </div>
@@ -1196,7 +1199,22 @@ function HistoryPage({ claims }: { claims: Claim[] }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
-  const [activeView, setActiveView] = useState('overview');
+  const [activeView, navigateFestView] = useHistoryView<FestSecretaryView>({
+    stateKey: 'secretaryFestView',
+    defaultView: 'overview',
+    validViews: FEST_SECRETARY_VIEWS,
+    buildHash: (view) => `#/app/secretary/fest/${view}`,
+    parseHash: (hash) => {
+      const match = hash.match(/^#\/app\/secretary\/fest\/([^/?#]+)/);
+      const view = match?.[1];
+      return view && FEST_SECRETARY_VIEWS.includes(view as FestSecretaryView) ? (view as FestSecretaryView) : null;
+    },
+  });
+  const navigateView = (view: string) => {
+    if (FEST_SECRETARY_VIEWS.includes(view as FestSecretaryView)) {
+      navigateFestView(view as FestSecretaryView);
+    }
+  };
   const [user, setUser] = useState<SecretaryUser | null>(null);
 
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -1263,6 +1281,9 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
           attachments: c.attachments || [],
           status: mapStatus(c.status),
           festName: c.festName || '',
+          teamName: c.teamName || c.committeeName || c.claimantCommittee || '',
+          transactionId: c.transactionId || '',
+          student: c.student || undefined,
           fcVerifiedBy: c.verifications?.find((v: any) => v.stage === 'FEST_COORDINATOR')?.verifierName || '',
           fcVerifiedAt: c.verifications?.find((v: any) => v.stage === 'FEST_COORDINATOR')?.verifiedAt || '',
           fcComment: c.verifications?.find((v: any) => v.stage === 'FEST_COORDINATOR')?.remarks || '',
@@ -1408,7 +1429,7 @@ export function FestSecretaryDashboard({ onLogout }: { onLogout: () => void }) {
       department="fest"
       navItems={navItems}
       activeView={activeView}
-      setActiveView={setActiveView}
+      setActiveView={navigateView}
       onLogout={onLogout}
       user={user} // 👈 Fixed: Pass the user state directly
       title="Cultural & Fest Cell"
