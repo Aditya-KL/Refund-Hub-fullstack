@@ -10,6 +10,8 @@ import { SecretaryDashboard } from './Secretary_Page/SecretaryDashboard';
 import { StudentDashboard } from './Student_Page/StudentDashboard';
 
 const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://127.0.0.1:8000';
+const SESSION_DURATION_MS = 12 * 60 * 60 * 1000; // 12 hours
+const AUTH_EXPIRY_KEY = 'authExpiresAt';
 
 type LoginView = 'gateway' | 'student' | 'registerStudent' | 'registerSuccess';
 type RegistrationData = { name: string; studentId: string } | null;
@@ -35,6 +37,27 @@ const parseHashToLoginView = (hash: string): LoginView | null => {
   return isLoginView(match[1]) ? match[1] : null;
 };
 
+const clearAuthStorage = () => {
+  localStorage.removeItem('user');
+  localStorage.removeItem('isLoggedIn');
+  localStorage.removeItem(AUTH_EXPIRY_KEY);
+};
+
+const getAuthExpiry = (): number | null => {
+  const raw = localStorage.getItem(AUTH_EXPIRY_KEY);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const hasValidSession = () => {
+  if (localStorage.getItem('isLoggedIn') !== 'true') return false;
+  const expiresAt = getAuthExpiry();
+  if (!expiresAt) return false;
+  if (Date.now() >= expiresAt) return false;
+  return true;
+};
+
 function App() {
   const getInitialState = useCallback((): AppNavState => {
     const stateFromHistory = window.history.state?.appNav;
@@ -44,6 +67,11 @@ function App() {
       typeof stateFromHistory.isAuthenticated === 'boolean' &&
       isLoginView(stateFromHistory.loginView)
     ) {
+      const allowAuthenticatedState = !stateFromHistory.isAuthenticated || hasValidSession();
+      if (!allowAuthenticatedState) {
+        clearAuthStorage();
+        return { isAuthenticated: false, loginView: 'gateway', registrationData: null };
+      }
       return {
         isAuthenticated: stateFromHistory.isAuthenticated,
         loginView: stateFromHistory.loginView,
@@ -56,7 +84,10 @@ function App() {
       return { isAuthenticated: false, loginView: hashLoginView, registrationData: null };
     }
 
-    const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+    const loggedIn = hasValidSession();
+    if (!loggedIn) {
+      clearAuthStorage();
+    }
     return { isAuthenticated: loggedIn, loginView: 'gateway', registrationData: null };
   }, []);
 
@@ -112,6 +143,15 @@ function App() {
         typeof popped.isAuthenticated === 'boolean' &&
         isLoginView(popped.loginView)
       ) {
+        if (popped.isAuthenticated && !hasValidSession()) {
+          clearAuthStorage();
+          applyState({
+            isAuthenticated: false,
+            loginView: 'gateway',
+            registrationData: null,
+          });
+          return;
+        }
         applyState({
           isAuthenticated: popped.isAuthenticated,
           loginView: popped.loginView,
@@ -148,8 +188,7 @@ function App() {
       // keep local logout flow even if API call fails
     }
 
-    localStorage.removeItem('user');
-    localStorage.removeItem('isLoggedIn');
+    clearAuthStorage();
 
     navigateState({
       isAuthenticated: false,
@@ -157,6 +196,44 @@ function App() {
       registrationData: null,
     });
   };
+
+  useEffect(() => {
+    const forceReloginIfExpired = () => {
+      if (!hasValidSession()) {
+        clearAuthStorage();
+        applyState({
+          isAuthenticated: false,
+          loginView: 'gateway',
+          registrationData: null,
+        });
+        writeHistoryState(
+          {
+            isAuthenticated: false,
+            loginView: 'gateway',
+            registrationData: null,
+          },
+          'replace'
+        );
+      }
+    };
+
+    forceReloginIfExpired();
+    const interval = window.setInterval(forceReloginIfExpired, 60_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        forceReloginIfExpired();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', forceReloginIfExpired);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', forceReloginIfExpired);
+    };
+  }, [applyState, writeHistoryState]);
 
   if (isAuthenticated) {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -181,8 +258,10 @@ function App() {
         <StudentLoginForm
           onBack={() => navigateLoginView('gateway')}
           onSignIn={(user: any) => {
+            const expiresAt = Date.now() + SESSION_DURATION_MS;
             localStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('user', JSON.stringify(user));
+            localStorage.setItem(AUTH_EXPIRY_KEY, String(expiresAt));
             navigateState({
               isAuthenticated: true,
               loginView: 'gateway',
@@ -219,4 +298,3 @@ function App() {
 }
 
 export default App;
-
